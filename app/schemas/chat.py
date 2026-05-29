@@ -19,6 +19,13 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     search: str = "auto"
     tools: str | list[str] = "auto"
+    conversation_id: str | None = None
+    store: bool = False
+    summary: str = "auto"
+    conversation_created: bool = Field(default=False, exclude=True)
+    conversation_summary_used: bool = Field(default=False, exclude=True)
+    conversation_summary_updated: bool = Field(default=False, exclude=True)
+    conversation_summary_mode: str = Field(default="auto", exclude=True)
 
 
 class ChatChoice(BaseModel):
@@ -45,6 +52,14 @@ class AuthDebugInfo(BaseModel):
     key_name: str
 
 
+class ConversationInfo(BaseModel):
+    id: str
+    created: bool = False
+    summary_mode: str = "auto"
+    summary_used: bool = False
+    summary_updated: bool = False
+
+
 class ChatCompletionResponse(BaseModel):
     id: str
     object: str = "chat.completion"
@@ -57,3 +72,4 @@ class ChatCompletionResponse(BaseModel):
     tools: ToolMetadata = Field(default_factory=ToolMetadata)
     sources: list[SourceItem] = Field(default_factory=list)
     auth: AuthDebugInfo | None = None
+    conversation: ConversationInfo | None = None

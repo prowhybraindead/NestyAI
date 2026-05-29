@@ -17,6 +17,7 @@ from app.schemas.chat import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     ChatMessage,
+    ConversationInfo,
     GuardInfo,
     Usage,
 )
@@ -38,6 +39,12 @@ class StreamOutcome:
     sources: list[SourceItem] = field(default_factory=list)
     status: str = "error"
     error_code: str = ""
+    assistant_content: str = ""
+    conversation_id: str | None = None
+    conversation_created: bool = False
+    conversation_summary_mode: str = "auto"
+    conversation_summary_used: bool = False
+    conversation_summary_updated: bool = False
 
 
 @dataclass
@@ -87,7 +94,7 @@ class ChatOrchestrator:
 
         started_at = time.perf_counter()
         tools_mode = self._normalize_and_validate_request(request)
-        model_profile, messages, input_guard_info, tools_meta, sources = await self._prepare_chat_context(
+        messages, input_guard_info, tools_meta, sources = await self._prepare_chat_context(
             request_id=request_id,
             request=request,
             tools_mode=tools_mode,
@@ -159,7 +166,7 @@ class ChatOrchestrator:
         request: ChatCompletionRequest,
     ) -> StreamHandle:
         tools_mode = self._normalize_and_validate_request(request)
-        model_profile, messages, input_guard_info, tools_meta, sources = await self._prepare_chat_context(
+        messages, input_guard_info, tools_meta, sources = await self._prepare_chat_context(
             request_id=request_id,
             request=request,
             tools_mode=tools_mode,
@@ -179,6 +186,11 @@ class ChatOrchestrator:
             provider=stream_result.provider_used,
             tools=tools_meta,
             sources=self._dedupe_sources(sources),
+            conversation_id=request.conversation_id if request.store else None,
+            conversation_created=request.conversation_created if request.store else False,
+            conversation_summary_mode=request.conversation_summary_mode if request.store else "auto",
+            conversation_summary_used=request.conversation_summary_used if request.store else False,
+            conversation_summary_updated=request.conversation_summary_updated if request.store else False,
         )
 
         async def stream_events() -> AsyncIterator[str]:
@@ -249,7 +261,7 @@ class ChatOrchestrator:
                 return
 
             if self.enable_output_guard:
-                _sanitized_text, output_guard_info = self.output_guard.scan_text("".join(full_output_parts))
+                sanitized_text, output_guard_info = self.output_guard.scan_text("".join(full_output_parts))
                 if output_guard_info.output_redacted:
                     yield self._to_sse(
                         {
@@ -267,6 +279,9 @@ class ChatOrchestrator:
                             ],
                         }
                     )
+                outcome.assistant_content = sanitized_text
+            else:
+                outcome.assistant_content = "".join(full_output_parts)
 
             outcome.guard = self._combine_guard_info(input_guard_info, output_guard_info)
             outcome.status = "success"
@@ -299,6 +314,17 @@ class ChatOrchestrator:
                     "tools": outcome.tools.model_dump(),
                     "sources": [item.model_dump() for item in outcome.sources],
                     "usage": outcome.usage.model_dump(),
+                    "conversation": (
+                        ConversationInfo(
+                            id=outcome.conversation_id,
+                            created=outcome.conversation_created,
+                            summary_mode=outcome.conversation_summary_mode,
+                            summary_used=outcome.conversation_summary_used,
+                            summary_updated=outcome.conversation_summary_updated,
+                        ).model_dump()
+                        if outcome.conversation_id
+                        else None
+                    ),
                 }
             )
             yield self._done_sse()
@@ -319,7 +345,7 @@ class ChatOrchestrator:
         request_id: str,
         request: ChatCompletionRequest,
         tools_mode: str | list[str],
-    ) -> tuple[Any, list[ChatMessage], GuardInfo, ToolMetadata, list[SourceItem]]:
+    ) -> tuple[list[ChatMessage], GuardInfo, ToolMetadata, list[SourceItem]]:
         model_profile = self.models_config.models.get(request.model)
         if not model_profile:
             raise APIError(
@@ -366,7 +392,7 @@ class ChatOrchestrator:
         if tool_context_text:
             messages = append_tool_context(messages, tool_context_text)
 
-        return model_profile, messages, input_guard_info, tools_meta, sources
+        return messages, input_guard_info, tools_meta, sources
 
     def _normalize_tools_mode(self, tools_field: str | list[str]) -> str | list[str]:
         if isinstance(tools_field, str):

@@ -231,6 +231,125 @@ CORS note:
 - If you call NestyAI directly from browser/mobile web in development, configure CORS intentionally.
 - Do not use wildcard CORS in production when private API keys are involved.
 
+## Conversation Session + Memory Foundation (Phase 6)
+
+NestyAI supports optional short-session memory via `conversation_id` + `store`.
+
+Key behavior:
+
+- `store=false` (default): existing stateless behavior, no conversation load/save.
+- `store=true`:
+  - if `conversation_id` missing: create a new conversation automatically.
+  - if `conversation_id` provided: load recent stored messages and append new turn.
+  - save sanitized user/assistant messages to SQLite.
+
+Example start request:
+
+```json
+{
+  "model": "nesty-combined-1.0",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Remember this conversation context for later in this session."
+    }
+  ],
+  "store": true
+}
+```
+
+Example follow-up request:
+
+```json
+{
+  "model": "nesty-combined-1.0",
+  "conversation_id": "conv_xxxxxxxxxxxxxxxx",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What did I ask earlier?"
+    }
+  ],
+  "store": true
+}
+```
+
+Conversation endpoints:
+
+- `GET /v1/conversations?limit=20&offset=0`
+- `GET /v1/conversations/{conversation_id}`
+- `PATCH /v1/conversations/{conversation_id}` with `{ "title": "..." }`
+- `DELETE /v1/conversations/{conversation_id}` (soft archive)
+
+Privacy note:
+
+- NestyAI stores sanitized messages when `store=true`.
+- `store=false` keeps stateless behavior and does not persist messages.
+
+## Conversation Summarization + History Compression (Phase 6.1)
+
+Phase 6.1 adds lightweight conversation summarization for long sessions.
+
+How it works:
+
+- Recent history window:
+  - still used for short conversations and as fallback.
+- Conversation summary:
+  - when a conversation grows past a threshold, older messages are compressed into a sanitized summary.
+  - prompt injection uses:
+    - summary context message
+    - recent unsummarized tail messages
+- Future long-term memory:
+  - not included yet in Phase 6.1 (no embeddings/vector DB).
+
+Summary config env:
+
+```bash
+CONVERSATION_SUMMARY_ENABLED=true
+CONVERSATION_SUMMARY_TRIGGER_MESSAGES=30
+CONVERSATION_SUMMARY_KEEP_RECENT_MESSAGES=12
+CONVERSATION_SUMMARY_MAX_CHARS=4000
+CONVERSATION_SUMMARY_MODEL=nesty-flash-1.0
+```
+
+Behavior notes:
+
+- Summarization is best-effort and must not fail chat responses.
+- Summaries are sanitized by guard logic before being saved.
+- `store=false` still disables conversation storage and summary logic.
+- Streaming and non-streaming flows both preserve existing API contract.
+
+## Conversation Quality, Controls, and Export (Phase 6.2)
+
+Phase 6.2 adds runtime controls for per-request summary behavior and conversation management endpoints.
+
+Per-request summary mode (`/v1/chat/completions`):
+
+- `summary: "auto"`: default behavior (use summary when available and summarize by trigger policy).
+- `summary: "off"`: do not inject summary and do not run post-response summarization for this request.
+- `summary: "force"`: use existing summary and force post-response summarization when `store=true`.
+
+Control and export endpoints:
+
+- `POST /v1/conversations/{conversation_id}/summarize`
+- `POST /v1/conversations/{conversation_id}/clear` with `{ "keep_summary": false }`
+- `POST /v1/conversations/{conversation_id}/reset-summary`
+- `GET /v1/conversations/{conversation_id}/export`
+
+Conversation metadata now includes:
+
+- `message_count`
+- `last_message_at`
+- `summary_exists`
+- `summary_message_count`
+- `summary_updated_at`
+
+Privacy notes:
+
+- Export returns stored sanitized conversation data (`conversation`, `summary`, `messages`).
+- Export does not include API key hash/raw key secrets.
+- Usage logs and provider secret config are not included in export.
+
 ## Run
 
 ```bash
@@ -291,6 +410,49 @@ Troubleshooting:
 - Do not commit `.env`.
 - Do not commit `data/nesty.db`.
 - Keep `SAFE_DEBUG_AUTH=false` in production.
+
+## Deployment Hardening (Phase 5.2)
+
+Recommended production env:
+
+```bash
+APP_ENV=production
+REQUIRE_API_KEY=true
+NESTY_API_KEY_HASH_SECRET=your_secret_here
+CORS_ENABLED=true
+CORS_ALLOW_ORIGINS=https://your-app.example.com
+TRUSTED_HOSTS=your-api.example.com
+SECURITY_HEADERS_ENABLED=true
+ENABLE_HSTS=false
+```
+
+CORS guidance:
+
+- Enable CORS only if browser/mobile-web clients need direct API access.
+- Do not use wildcard CORS (`*`) in production when `REQUIRE_API_KEY=true`.
+- Configure exact allowed origins.
+
+Health vs readiness:
+
+- `GET /health`: lightweight liveness signal.
+- `GET /ready`: readiness signal with local database connectivity check.
+
+Docker Compose quick start:
+
+```bash
+docker compose up --build -d
+```
+
+This uses `docker-compose.yml` with:
+
+- `env_file: .env`
+- persistent data mount `./data:/app/data`
+- port mapping `8000:8000`
+
+Reverse proxy note:
+
+- In production, run NestyAI behind Nginx/Caddy/Traefik for TLS termination and request filtering.
+- If TLS is guaranteed end-to-end, you may enable `ENABLE_HSTS=true`.
 
 ## Notes
 

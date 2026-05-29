@@ -31,6 +31,7 @@ def insert_usage_log(
     request_id: str,
     status: str,
     api_key_id: str | None = None,
+    conversation_id: str | None = None,
     model: str | None = None,
     provider: str | None = None,
     prompt_tokens: int = 0,
@@ -49,14 +50,15 @@ def insert_usage_log(
         conn.execute(
             """
             INSERT INTO usage_logs
-            (id, api_key_id, request_id, model, provider, prompt_tokens, completion_tokens, total_tokens,
+            (id, api_key_id, request_id, conversation_id, model, provider, prompt_tokens, completion_tokens, total_tokens,
              tools_used, search_used, latency_ms, status, error_code, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 usage_id,
                 api_key_id,
                 request_id,
+                conversation_id,
                 model,
                 provider,
                 int(prompt_tokens),

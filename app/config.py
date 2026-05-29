@@ -43,6 +43,23 @@ class Settings(BaseModel):
     rate_limit_enabled: bool = True
     rate_limit_requests_per_minute: int = 60
     safe_debug_auth: bool = False
+    cors_enabled: bool = False
+    cors_allow_origins: str = ""
+    cors_allow_methods: str = "GET,POST,OPTIONS"
+    cors_allow_headers: str = "Authorization,Content-Type,X-Nesty-API-Key"
+    cors_allow_credentials: bool = False
+    trusted_hosts: str = ""
+    max_request_body_bytes: int = 1048576
+    security_headers_enabled: bool = True
+    enable_hsts: bool = False
+    conversation_history_enabled: bool = True
+    conversation_history_max_messages: int = 20
+    conversation_history_max_chars: int = 12000
+    conversation_summary_enabled: bool = True
+    conversation_summary_trigger_messages: int = 30
+    conversation_summary_keep_recent_messages: int = 12
+    conversation_summary_max_chars: int = 4000
+    conversation_summary_model: str = "nesty-flash-1.0"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -67,6 +84,25 @@ class Settings(BaseModel):
             rate_limit_enabled=_to_bool(os.getenv("RATE_LIMIT_ENABLED"), True),
             rate_limit_requests_per_minute=int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "60")),
             safe_debug_auth=_to_bool(os.getenv("SAFE_DEBUG_AUTH"), False),
+            cors_enabled=_to_bool(os.getenv("CORS_ENABLED"), False),
+            cors_allow_origins=os.getenv("CORS_ALLOW_ORIGINS", ""),
+            cors_allow_methods=os.getenv("CORS_ALLOW_METHODS", "GET,POST,OPTIONS"),
+            cors_allow_headers=os.getenv("CORS_ALLOW_HEADERS", "Authorization,Content-Type,X-Nesty-API-Key"),
+            cors_allow_credentials=_to_bool(os.getenv("CORS_ALLOW_CREDENTIALS"), False),
+            trusted_hosts=os.getenv("TRUSTED_HOSTS", ""),
+            max_request_body_bytes=int(os.getenv("MAX_REQUEST_BODY_BYTES", "1048576")),
+            security_headers_enabled=_to_bool(os.getenv("SECURITY_HEADERS_ENABLED"), True),
+            enable_hsts=_to_bool(os.getenv("ENABLE_HSTS"), False),
+            conversation_history_enabled=_to_bool(os.getenv("CONVERSATION_HISTORY_ENABLED"), True),
+            conversation_history_max_messages=int(os.getenv("CONVERSATION_HISTORY_MAX_MESSAGES", "20")),
+            conversation_history_max_chars=int(os.getenv("CONVERSATION_HISTORY_MAX_CHARS", "12000")),
+            conversation_summary_enabled=_to_bool(os.getenv("CONVERSATION_SUMMARY_ENABLED"), True),
+            conversation_summary_trigger_messages=int(os.getenv("CONVERSATION_SUMMARY_TRIGGER_MESSAGES", "30")),
+            conversation_summary_keep_recent_messages=int(
+                os.getenv("CONVERSATION_SUMMARY_KEEP_RECENT_MESSAGES", "12")
+            ),
+            conversation_summary_max_chars=int(os.getenv("CONVERSATION_SUMMARY_MAX_CHARS", "4000")),
+            conversation_summary_model=os.getenv("CONVERSATION_SUMMARY_MODEL", "nesty-flash-1.0"),
         )
 
 

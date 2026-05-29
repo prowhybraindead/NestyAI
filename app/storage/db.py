@@ -39,6 +39,7 @@ def init_db(db_path: str) -> None:
                 id TEXT PRIMARY KEY,
                 api_key_id TEXT,
                 request_id TEXT NOT NULL,
+                conversation_id TEXT DEFAULT NULL,
                 model TEXT,
                 provider TEXT,
                 prompt_tokens INTEGER DEFAULT 0,
@@ -53,7 +54,66 @@ def init_db(db_path: str) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                api_key_id TEXT DEFAULT NULL,
+                title TEXT DEFAULT NULL,
+                summary TEXT DEFAULT NULL,
+                summary_updated_at TEXT DEFAULT NULL,
+                summary_message_count INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                archived_at TEXT DEFAULT NULL,
+                metadata TEXT DEFAULT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                model TEXT DEFAULT NULL,
+                provider TEXT DEFAULT NULL,
+                token_count INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                metadata TEXT DEFAULT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversation_messages_conv_created "
+            "ON conversation_messages(conversation_id, created_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversations_api_key_updated "
+            "ON conversations(api_key_id, updated_at)"
+        )
+        _ensure_usage_logs_has_conversation_id(conn)
+        _ensure_conversations_summary_columns(conn)
         conn.commit()
+
+
+def _ensure_usage_logs_has_conversation_id(conn: sqlite3.Connection) -> None:
+    rows = conn.execute("PRAGMA table_info(usage_logs)").fetchall()
+    column_names = {str(row[1]) for row in rows}
+    if "conversation_id" not in column_names:
+        conn.execute("ALTER TABLE usage_logs ADD COLUMN conversation_id TEXT DEFAULT NULL")
+
+
+def _ensure_conversations_summary_columns(conn: sqlite3.Connection) -> None:
+    rows = conn.execute("PRAGMA table_info(conversations)").fetchall()
+    column_names = {str(row[1]) for row in rows}
+    if "summary" not in column_names:
+        conn.execute("ALTER TABLE conversations ADD COLUMN summary TEXT DEFAULT NULL")
+    if "summary_updated_at" not in column_names:
+        conn.execute("ALTER TABLE conversations ADD COLUMN summary_updated_at TEXT DEFAULT NULL")
+    if "summary_message_count" not in column_names:
+        conn.execute("ALTER TABLE conversations ADD COLUMN summary_message_count INTEGER DEFAULT 0")
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:

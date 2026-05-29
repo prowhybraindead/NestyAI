@@ -13,6 +13,8 @@ ERROR_CODES = {
     "streaming_not_supported",
     "stream_interrupted",
     "stream_provider_failed",
+    "request_too_large",
+    "unsafe_cors_configuration",
     "invalid_request",
     "search_failed",
     "context_sanitization_failed",
@@ -29,6 +31,14 @@ ERROR_CODES = {
     "daily_quota_exceeded",
     "monthly_quota_exceeded",
     "usage_logging_failed",
+    "conversation_not_found",
+    "conversation_access_denied",
+    "conversation_storage_failed",
+    "invalid_conversation_request",
+    "conversation_summary_failed",
+    "invalid_summary_mode",
+    "conversation_export_failed",
+    "conversation_clear_failed",
 }
 
 
