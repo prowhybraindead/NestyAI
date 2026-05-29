@@ -1,25 +1,31 @@
+# Environment
 .env
 .venv/
 venv/
 env/
 
+# Local data / databases
 data/
 *.db
 *.sqlite
 *.sqlite3
 
-.pytest_cache/
-pytest-cache-files-*
-
+# Python cache / build artifacts
 __pycache__/
 *.py[cod]
-*.pyc
 *.pyo
 
+# Test / tooling cache
+.pytest_cache/
+pytest-cache-files-*
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
 
+# Local temp folders
+tmp_script_checks/
+
+# OS files
 .DS_Store
 Thumbs.db
