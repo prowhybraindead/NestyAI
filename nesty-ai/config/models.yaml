@@ -1,0 +1,64 @@
+models:
+  nesty-flash-1.0:
+    display_name: "Nesty Flash 1.0"
+    description: "Fast lightweight model profile"
+    strategy: "speed"
+    search_mode: "off"
+    tools_mode: "auto"
+    max_tool_calls: 1
+    allowed_tools:
+      - "calculator"
+      - "package_version_lookup"
+    max_search_results: 3
+    max_context_chars: 2000
+    provider_chain:
+      - provider: "groq"
+        model: "llama-3.1-8b-instant"
+      - provider: "openrouter"
+        model: "qwen/qwen3-14b:free"
+
+  nesty-combined-1.0:
+    display_name: "Nesty Combined 1.0"
+    description: "Balanced multi-provider model profile"
+    strategy: "balanced"
+    search_mode: "auto"
+    tools_mode: "auto"
+    max_tool_calls: 3
+    allowed_tools:
+      - "calculator"
+      - "wikipedia_lookup"
+      - "package_version_lookup"
+      - "weather_lookup"
+      - "exchange_rate"
+    max_search_results: 5
+    max_context_chars: 6000
+    provider_chain:
+      - provider: "groq"
+        model: "llama-3.3-70b-versatile"
+      - provider: "openrouter"
+        model: "qwen/qwen3-32b:free"
+      - provider: "nvidia"
+        model: "default"
+
+  nesty-pro-1.0:
+    display_name: "Nesty Pro 1.0"
+    description: "High-quality reasoning and research model profile"
+    strategy: "quality"
+    search_mode: "auto"
+    tools_mode: "auto"
+    max_tool_calls: 6
+    allowed_tools:
+      - "calculator"
+      - "wikipedia_lookup"
+      - "package_version_lookup"
+      - "weather_lookup"
+      - "exchange_rate"
+    max_search_results: 8
+    max_context_chars: 12000
+    provider_chain:
+      - provider: "openrouter"
+        model: "deepseek/deepseek-r1:free"
+      - provider: "nvidia"
+        model: "deepseek-ai/deepseek-r1"
+      - provider: "groq"
+        model: "llama-3.3-70b-versatile"
