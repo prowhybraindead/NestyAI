@@ -10,12 +10,16 @@ from app.security.auth import AuthContext, optional_api_key, require_api_key
 from app.storage.conversations import (
     archive_conversation,
     clear_conversation_messages,
+    count_messages,
     export_conversation,
-    get_conversation_stats,
     get_conversation,
+    get_conversation_stats,
     get_recent_messages,
     list_conversations,
+    list_messages,
     reset_conversation_summary,
+    search_conversations,
+    search_messages,
     update_conversation_title,
 )
 
@@ -54,16 +58,81 @@ def _conversation_accessible(settings, conversation: dict | None, auth_context: 
     return owner == auth_context.api_key_id
 
 
+def _validate_limit_offset(limit: int, offset: int) -> tuple[int, int]:
+    if offset < 0:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid pagination offset.",
+            status_code=400,
+        )
+    if limit < 1 or limit > 100:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid pagination limit.",
+            status_code=400,
+        )
+    return limit, offset
+
+
+def _validate_query(query: str) -> str:
+    cleaned = query.strip()
+    if not cleaned:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Search query must not be empty.",
+            status_code=400,
+        )
+    if len(cleaned) > 200:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Search query is too long.",
+            status_code=400,
+        )
+    return cleaned
+
+
 @router.get("")
-async def get_conversations(request: Request, limit: int = 20, offset: int = 0) -> dict:
+async def get_conversations(
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    archived: str = "active",
+    q: str | None = None,
+) -> dict:
     settings = get_settings()
     auth_context = _resolve_auth_context(settings, request)
     api_key_id = auth_context.api_key_id if auth_context else None
+    limit, offset = _validate_limit_offset(limit, offset)
+
+    archived_mode = archived.strip().lower()
+    if archived_mode not in {"active", "archived", "all"}:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid archived filter.",
+            status_code=400,
+        )
+
+    query = q.strip() if q else ""
+    if q is not None:
+        if not query:
+            raise APIError(
+                code="invalid_conversation_request",
+                message="Search query must not be empty.",
+                status_code=400,
+            )
+        if len(query) > 200:
+            raise APIError(
+                code="invalid_conversation_request",
+                message="Search query is too long.",
+                status_code=400,
+            )
 
     items = list_conversations(
         api_key_id=api_key_id,
-        limit=max(1, min(int(limit), 100)),
-        offset=max(0, int(offset)),
+        limit=limit,
+        offset=offset,
+        archived=archived_mode,
+        q=query or None,
         db_path=settings.nesty_db_path,
     )
     with_counts = []
@@ -86,10 +155,128 @@ async def get_conversations(request: Request, limit: int = 20, offset: int = 0) 
     return {"object": "list", "data": with_counts}
 
 
+@router.get("/search")
+async def search_conversations_endpoint(
+    request: Request,
+    q: str,
+    limit: int = 20,
+    offset: int = 0,
+    scope: str = "all",
+) -> dict:
+    settings = get_settings()
+    auth_context = _resolve_auth_context(settings, request)
+    api_key_id = auth_context.api_key_id if auth_context else None
+    limit, offset = _validate_limit_offset(limit, offset)
+    query = _validate_query(q)
+
+    scope_mode = scope.strip().lower()
+    if scope_mode not in {"conversations", "messages", "all"}:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid search scope.",
+            status_code=400,
+        )
+
+    conversations_data: list[dict] = []
+    messages_data: list[dict] = []
+    has_more = False
+
+    if scope_mode in {"conversations", "all"}:
+        rows = search_conversations(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit + 1,
+            offset=offset,
+            include_archived=False,
+            db_path=settings.nesty_db_path,
+        )
+        has_more = has_more or len(rows) > limit
+        conversations_data = rows[:limit]
+
+    if scope_mode in {"messages", "all"}:
+        rows = search_messages(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit + 1,
+            offset=offset,
+            db_path=settings.nesty_db_path,
+        )
+        has_more = has_more or len(rows) > limit
+        messages_data = rows[:limit]
+
+    return {
+        "object": "conversation.search_results",
+        "query": query,
+        "conversations": conversations_data,
+        "messages": messages_data,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "count": len(conversations_data) + len(messages_data),
+            "has_more": has_more,
+        },
+    }
+
+
+@router.get("/{conversation_id}/messages")
+async def get_conversation_messages(
+    request: Request,
+    conversation_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    order: str = "asc",
+) -> dict:
+    settings = get_settings()
+    auth_context = _resolve_auth_context(settings, request)
+    limit, offset = _validate_limit_offset(limit, offset)
+
+    order_mode = order.strip().lower()
+    if order_mode not in {"asc", "desc"}:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid messages order.",
+            status_code=400,
+        )
+
+    conversation = get_conversation(conversation_id, db_path=settings.nesty_db_path)
+    if not _conversation_accessible(settings, conversation, auth_context):
+        raise APIError(
+            code="conversation_not_found",
+            message="Conversation not found.",
+            status_code=404,
+        )
+
+    rows = list_messages(
+        conversation_id=conversation_id,
+        limit=limit,
+        offset=offset,
+        order=order_mode,
+        db_path=settings.nesty_db_path,
+    )
+    total = count_messages(conversation_id=conversation_id, db_path=settings.nesty_db_path)
+    return {
+        "object": "list",
+        "conversation_id": conversation_id,
+        "data": rows,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "count": len(rows),
+            "has_more": (offset + len(rows)) < total,
+        },
+    }
+
+
 @router.get("/{conversation_id}")
 async def get_conversation_detail(request: Request, conversation_id: str, limit: int = 20) -> dict:
     settings = get_settings()
     auth_context = _resolve_auth_context(settings, request)
+    if limit < 1 or limit > 200:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid messages limit.",
+            status_code=400,
+        )
 
     conversation = get_conversation(conversation_id, db_path=settings.nesty_db_path)
     if not _conversation_accessible(settings, conversation, auth_context):
@@ -101,7 +288,7 @@ async def get_conversation_detail(request: Request, conversation_id: str, limit:
 
     messages = get_recent_messages(
         conversation_id=conversation_id,
-        limit=max(1, min(int(limit), 200)),
+        limit=limit,
         db_path=settings.nesty_db_path,
     )
     stats = get_conversation_stats(conversation_id, db_path=settings.nesty_db_path)
@@ -265,14 +452,29 @@ async def reset_summary_endpoint(request: Request, conversation_id: str) -> dict
 
 
 @router.get("/{conversation_id}/export")
-async def export_conversation_endpoint(request: Request, conversation_id: str) -> dict:
+async def export_conversation_endpoint(
+    request: Request,
+    conversation_id: str,
+    include_metadata: bool = True,
+    messages_order: str = "asc",
+) -> dict:
     settings = get_settings()
     auth_context = _resolve_auth_context(settings, request)
     api_key_id = auth_context.api_key_id if auth_context else None
 
+    order_mode = messages_order.strip().lower()
+    if order_mode not in {"asc", "desc"}:
+        raise APIError(
+            code="invalid_conversation_request",
+            message="Invalid export message order.",
+            status_code=400,
+        )
+
     exported = export_conversation(
         conversation_id=conversation_id,
         api_key_id=api_key_id,
+        include_metadata=include_metadata,
+        messages_order=order_mode,
         db_path=settings.nesty_db_path,
     )
     if exported is None:

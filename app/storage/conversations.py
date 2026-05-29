@@ -97,20 +97,37 @@ def list_conversations(
     api_key_id: str | None,
     limit: int = 20,
     offset: int = 0,
+    archived: str = "active",
+    q: str | None = None,
     db_path: str | None = None,
 ) -> list[dict[str, Any]]:
     query = """
         SELECT id, api_key_id, title, summary, summary_updated_at, summary_message_count,
                created_at, updated_at, archived_at, metadata
         FROM conversations
-        WHERE archived_at IS NULL
+        WHERE 1=1
     """
     params: list[Any] = []
+    if archived == "active":
+        query += " AND archived_at IS NULL"
+    elif archived == "archived":
+        query += " AND archived_at IS NOT NULL"
+    elif archived == "all":
+        pass
+    else:
+        raise ValueError("invalid archived filter")
+
     if api_key_id is None:
         query += " AND api_key_id IS NULL"
     else:
         query += " AND api_key_id = ?"
         params.append(api_key_id)
+    query_text = (q or "").strip()
+    if query_text:
+        query += " AND (title LIKE ? OR summary LIKE ?)"
+        like_value = f"%{query_text}%"
+        params.extend([like_value, like_value])
+
     query += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
     params.extend([max(1, int(limit)), max(0, int(offset))])
 
@@ -238,6 +255,45 @@ def get_recent_messages(
             "metadata": _parse_metadata(row["metadata"]),
         }
         for row in ordered
+    ]
+
+
+def list_messages(
+    conversation_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    order: str = "asc",
+    db_path: str | None = None,
+) -> list[dict[str, Any]]:
+    order_sql = "ASC" if order == "asc" else "DESC"
+    with get_connection(_effective_db_path(db_path)) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, conversation_id, role, content, model, provider, token_count, created_at, metadata
+            FROM conversation_messages
+            WHERE conversation_id = ?
+            ORDER BY created_at {order_sql}
+            LIMIT ? OFFSET ?
+            """,
+            (
+                conversation_id,
+                max(1, int(limit)),
+                max(0, int(offset)),
+            ),
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "conversation_id": row["conversation_id"],
+            "role": row["role"],
+            "content": row["content"],
+            "model": row["model"],
+            "provider": row["provider"],
+            "token_count": int(row["token_count"] or 0),
+            "created_at": row["created_at"],
+            "metadata": _parse_metadata(row["metadata"]),
+        }
+        for row in rows
     ]
 
 
@@ -439,6 +495,8 @@ def reset_conversation_summary(
 def export_conversation(
     conversation_id: str,
     api_key_id: str | None,
+    include_metadata: bool = True,
+    messages_order: str = "asc",
     db_path: str | None = None,
 ) -> dict[str, Any] | None:
     query = """
@@ -458,12 +516,21 @@ def export_conversation(
         conversation_row = conn.execute(query, tuple(params)).fetchone()
         if conversation_row is None:
             return None
+        order_sql = "ASC" if messages_order == "asc" else "DESC"
         message_rows = conn.execute(
             """
             SELECT id, role, content, model, provider, token_count, created_at, metadata
             FROM conversation_messages
             WHERE conversation_id = ?
-            ORDER BY created_at ASC
+            ORDER BY created_at
+            """,
+            (conversation_id,),
+        ).fetchall() if order_sql == "ASC" else conn.execute(
+            """
+            SELECT id, role, content, model, provider, token_count, created_at, metadata
+            FROM conversation_messages
+            WHERE conversation_id = ?
+            ORDER BY created_at DESC
             """,
             (conversation_id,),
         ).fetchall()
@@ -480,8 +547,9 @@ def export_conversation(
         "summary_updated_at": conversation_row["summary_updated_at"],
         "message_count": stats["message_count"],
         "last_message_at": stats["last_message_at"],
-        "metadata": _parse_metadata(conversation_row["metadata"]),
     }
+    if include_metadata:
+        conversation_payload["metadata"] = _parse_metadata(conversation_row["metadata"])
     messages_payload = [
         {
             "id": row["id"],
@@ -491,12 +559,112 @@ def export_conversation(
             "provider": row["provider"],
             "token_count": int(row["token_count"] or 0),
             "created_at": row["created_at"],
-            "metadata": _parse_metadata(row["metadata"]),
         }
         for row in message_rows
     ]
+    if include_metadata:
+        for item, row in zip(messages_payload, message_rows):
+            item["metadata"] = _parse_metadata(row["metadata"])
     return {
         "conversation": conversation_payload,
         "summary": conversation_row["summary"],
         "messages": messages_payload,
     }
+
+
+def search_conversations(
+    api_key_id: str | None,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    include_archived: bool = False,
+    db_path: str | None = None,
+) -> list[dict[str, Any]]:
+    sql = """
+        SELECT id, title, summary, summary_updated_at, summary_message_count, created_at, updated_at, archived_at
+        FROM conversations
+        WHERE 1=1
+    """
+    params: list[Any] = []
+    if api_key_id is None:
+        sql += " AND api_key_id IS NULL"
+    else:
+        sql += " AND api_key_id = ?"
+        params.append(api_key_id)
+    if not include_archived:
+        sql += " AND archived_at IS NULL"
+    like_value = f"%{query}%"
+    sql += " AND (title LIKE ? OR summary LIKE ?)"
+    params.extend([like_value, like_value])
+    sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+    params.extend([max(1, int(limit)), max(0, int(offset))])
+
+    with get_connection(_effective_db_path(db_path)) as conn:
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "archived_at": row["archived_at"],
+            "summary_exists": bool(str(row["summary"] or "").strip()),
+            "summary_updated_at": row["summary_updated_at"],
+            "summary_message_count": int(row["summary_message_count"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def search_messages(
+    api_key_id: str | None,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    db_path: str | None = None,
+) -> list[dict[str, Any]]:
+    sql = """
+        SELECT
+            m.id,
+            m.conversation_id,
+            m.role,
+            m.content,
+            m.model,
+            m.provider,
+            m.token_count,
+            m.created_at,
+            m.metadata,
+            c.title AS conversation_title
+        FROM conversation_messages m
+        JOIN conversations c ON c.id = m.conversation_id
+        WHERE c.archived_at IS NULL
+    """
+    params: list[Any] = []
+    if api_key_id is None:
+        sql += " AND c.api_key_id IS NULL"
+    else:
+        sql += " AND c.api_key_id = ?"
+        params.append(api_key_id)
+    like_value = f"%{query}%"
+    sql += " AND (m.content LIKE ? OR c.title LIKE ?)"
+    params.extend([like_value, like_value])
+    sql += " ORDER BY m.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([max(1, int(limit)), max(0, int(offset))])
+
+    with get_connection(_effective_db_path(db_path)) as conn:
+        rows = conn.execute(sql, tuple(params)).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "conversation_id": row["conversation_id"],
+            "conversation_title": row["conversation_title"],
+            "role": row["role"],
+            "content": row["content"],
+            "model": row["model"],
+            "provider": row["provider"],
+            "token_count": int(row["token_count"] or 0),
+            "created_at": row["created_at"],
+            "metadata": _parse_metadata(row["metadata"]),
+        }
+        for row in rows
+    ]

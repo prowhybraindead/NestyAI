@@ -350,6 +350,44 @@ Privacy notes:
 - Export does not include API key hash/raw key secrets.
 - Usage logs and provider secret config are not included in export.
 
+## Conversation Search, Message Pagination, and Better Listing (Phase 6.3)
+
+New capabilities:
+
+- Message pagination endpoint:
+  - `GET /v1/conversations/{conversation_id}/messages`
+  - query params: `limit`, `offset`, `order=asc|desc`
+- Conversation list filters:
+  - `GET /v1/conversations?archived=active|archived|all&q=...`
+- Keyword search endpoint:
+  - `GET /v1/conversations/search?q=...&scope=conversations|messages|all`
+
+Examples:
+
+List active conversations:
+
+```bash
+GET /v1/conversations?limit=20&offset=0&archived=active
+```
+
+List archived conversations:
+
+```bash
+GET /v1/conversations?limit=20&offset=0&archived=archived
+```
+
+Search conversations/messages:
+
+```bash
+GET /v1/conversations/search?q=budget&scope=all&limit=20&offset=0
+```
+
+Fetch one page of conversation messages:
+
+```bash
+GET /v1/conversations/conv_xxxxxxxxxxxxxxxx/messages?limit=50&offset=0&order=asc
+```
+
 ## Run
 
 ```bash
