@@ -28,7 +28,7 @@ NestyAI is a personal AI gateway focused on:
 - optional embeddings + semantic recall foundation
 - deterministic local-first architecture (SQLite)
 
-Current status: **Phase 7.3 completed**.
+Current status: **Phase 8.0 completed**.
 
 ---
 
@@ -50,6 +50,7 @@ Current status: **Phase 7.3 completed**.
 - embedding provider abstraction + optional message embedding
 - semantic recall (optional, local cosine similarity over stored embeddings)
 - memory safety controls (pinned/excluded/tags + recall dedup)
+- provider health diagnostics and benchmark utilities
 
 ---
 
@@ -199,6 +200,23 @@ Semantic recall requires:
 - no cross-key recall exposure (ownership boundary enforced)
 - excluded-message embeddings can be cleaned via `scripts/cleanup_memory.py`
 
+### Provider health diagnostics (Phase 8.0)
+
+- lightweight provider/model diagnostics with tiny prompt checks
+- diagnostics for model aliases and orchestration roles
+- local SQLite storage of diagnostic results (`provider_health_checks`)
+- internal admin diagnostics endpoints for health listing and check execution
+- benchmark scripts for provider chains and latest health summaries
+- diagnostics are isolated from normal chat:
+  - no tools
+  - no search
+  - no conversation memory
+  - no user conversation payload reuse
+- operational notes:
+  - diagnostics consume normal provider quota
+  - OpenRouter free models may be rate-limited
+  - results can vary by time, region, and provider availability
+
 ---
 
 ## Internal Admin APIs
@@ -218,6 +236,13 @@ These endpoints are **server-to-server internal APIs** and should not be exposed
 
 - `POST /internal/embeddings/test`
 - `POST /internal/embeddings/recall-test`
+
+### Internal diagnostics utilities (Phase 8.0)
+
+- `GET /internal/diagnostics/provider-health`
+- `GET /internal/diagnostics/provider-health/latest`
+- `POST /internal/diagnostics/provider-health/check`
+- `POST /internal/diagnostics/provider-model/check`
 
 Protected by:
 
@@ -306,6 +331,14 @@ Also:
 - `SEMANTIC_RECALL_MAX_PER_CONVERSATION`
 - `SEMANTIC_RECALL_EXCLUDE_MEMORY_EXCLUDED`
 
+### Diagnostics
+
+- `DIAGNOSTICS_ENABLED`
+- `DIAGNOSTICS_DEFAULT_TIMEOUT_SECONDS`
+- `DIAGNOSTICS_TEST_MAX_TOKENS`
+- `DIAGNOSTICS_SAVE_RESULTS`
+- `DIAGNOSTICS_OUTPUT_PREVIEW_CHARS`
+
 See [`.env.example`](.env.example) for full list.
 
 ---
@@ -318,6 +351,8 @@ See [`.env.example`](.env.example) for full list.
 - `python scripts/test_semantic_recall.py --text "What did I say earlier?"`
 - `python scripts/evaluate_semantic_recall.py --query "What did I say earlier?" --show-content-preview`
 - `python scripts/cleanup_memory.py --delete-embeddings-for-excluded`
+- `python scripts/benchmark_provider_chains.py --include-roles`
+- `python scripts/provider_health_summary.py --limit 50`
 
 ---
 
@@ -362,15 +397,17 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 
 - model-config endpoints under `/internal/model-configs/*`
 - embedding utility endpoints under `/internal/embeddings/*`
+- diagnostics endpoints under `/internal/diagnostics/*`
 
 ---
 
 ## Quality Status
 
-- test suite: **253 passed**
+- test suite: **304 passed**
 - streaming SSE contract: enabled
 - FTS fallback behavior: enabled
 - semantic recall: optional, disabled by default
+- provider diagnostics: optional and internal-admin-only
 
 ---
 
@@ -393,4 +430,4 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 
 ## Next Phase
 
-Recommended next target: **Phase 7.3 - Semantic Recall Quality Controls** (ranking calibration, memory quality policy, stronger safety filters).
+Recommended next target: **Phase 8.1 - Automated Routing Quality Controls** (provider scorecard weighting, adaptive fallback tuning, regression guardrails).

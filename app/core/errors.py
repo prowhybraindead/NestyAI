@@ -62,6 +62,10 @@ ERROR_CODES = {
     "invalid_memory_control_request",
     "memory_control_update_failed",
     "memory_eval_failed",
+    "diagnostics_disabled",
+    "provider_diagnostic_failed",
+    "provider_health_not_found",
+    "invalid_diagnostic_request",
 }
 
 

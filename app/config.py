@@ -90,6 +90,11 @@ class Settings(BaseModel):
     semantic_recall_dedup_similarity: float = 0.96
     semantic_recall_max_per_conversation: int = 3
     semantic_recall_exclude_memory_excluded: bool = True
+    diagnostics_enabled: bool = True
+    diagnostics_default_timeout_seconds: float = 20.0
+    diagnostics_test_max_tokens: int = 16
+    diagnostics_save_results: bool = True
+    diagnostics_output_preview_chars: int = 80
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -187,6 +192,11 @@ class Settings(BaseModel):
             semantic_recall_exclude_memory_excluded=_to_bool(
                 os.getenv("SEMANTIC_RECALL_EXCLUDE_MEMORY_EXCLUDED"), True
             ),
+            diagnostics_enabled=_to_bool(os.getenv("DIAGNOSTICS_ENABLED"), True),
+            diagnostics_default_timeout_seconds=float(os.getenv("DIAGNOSTICS_DEFAULT_TIMEOUT_SECONDS", "20")),
+            diagnostics_test_max_tokens=int(os.getenv("DIAGNOSTICS_TEST_MAX_TOKENS", "16")),
+            diagnostics_save_results=_to_bool(os.getenv("DIAGNOSTICS_SAVE_RESULTS"), True),
+            diagnostics_output_preview_chars=int(os.getenv("DIAGNOSTICS_OUTPUT_PREVIEW_CHARS", "80")),
         )
 
 

@@ -53,6 +53,16 @@ def test_cleanup_memory_module_import_has_no_side_effects() -> None:
     assert callable(module.main)
 
 
+def test_benchmark_provider_chains_module_import_has_no_side_effects() -> None:
+    module = importlib.import_module("scripts.benchmark_provider_chains")
+    assert callable(module.main)
+
+
+def test_provider_health_summary_module_import_has_no_side_effects() -> None:
+    module = importlib.import_module("scripts.provider_health_summary")
+    assert callable(module.main)
+
+
 def test_list_render_does_not_expose_key_hash() -> None:
     module = importlib.import_module("scripts.list_api_keys")
     lines = module.render_api_key_lines(

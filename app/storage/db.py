@@ -172,9 +172,41 @@ def init_db(db_path: str) -> None:
             "CREATE INDEX IF NOT EXISTS idx_embedding_records_content_hash "
             "ON embedding_records(content_hash)"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS provider_health_checks (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                model_alias TEXT DEFAULT NULL,
+                role TEXT DEFAULT NULL,
+                status TEXT NOT NULL,
+                error_code TEXT DEFAULT NULL,
+                error_message TEXT DEFAULT NULL,
+                latency_ms INTEGER DEFAULT NULL,
+                output_chars INTEGER DEFAULT 0,
+                tokens_per_second REAL DEFAULT NULL,
+                checked_at TEXT NOT NULL,
+                metadata TEXT DEFAULT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_provider_health_provider_model_checked "
+            "ON provider_health_checks(provider, model, checked_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_provider_health_model_alias_checked "
+            "ON provider_health_checks(model_alias, checked_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_provider_health_status_checked "
+            "ON provider_health_checks(status, checked_at)"
+        )
         _ensure_usage_logs_has_conversation_id(conn)
         _ensure_conversations_summary_columns(conn)
         _ensure_conversation_messages_memory_columns(conn)
+        _ensure_provider_health_checks_table(conn)
         conn.commit()
     _try_init_conversation_fts(db_path)
 
@@ -208,6 +240,40 @@ def _ensure_conversation_messages_memory_columns(conn: sqlite3.Connection) -> No
         conn.execute("ALTER TABLE conversation_messages ADD COLUMN memory_tags TEXT DEFAULT NULL")
     if "memory_updated_at" not in column_names:
         conn.execute("ALTER TABLE conversation_messages ADD COLUMN memory_updated_at TEXT DEFAULT NULL")
+
+
+def _ensure_provider_health_checks_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS provider_health_checks (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            model_alias TEXT DEFAULT NULL,
+            role TEXT DEFAULT NULL,
+            status TEXT NOT NULL,
+            error_code TEXT DEFAULT NULL,
+            error_message TEXT DEFAULT NULL,
+            latency_ms INTEGER DEFAULT NULL,
+            output_chars INTEGER DEFAULT 0,
+            tokens_per_second REAL DEFAULT NULL,
+            checked_at TEXT NOT NULL,
+            metadata TEXT DEFAULT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_provider_health_provider_model_checked "
+        "ON provider_health_checks(provider, model, checked_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_provider_health_model_alias_checked "
+        "ON provider_health_checks(model_alias, checked_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_provider_health_status_checked "
+        "ON provider_health_checks(status, checked_at)"
+    )
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:
