@@ -2,6 +2,37 @@
 
 All notable changes to the NestyAI project are documented in this file.
 
+## [Phase 10.0] - Gateway Core v1 Stabilization
+- Bump version to `1.0.0` for official stable release.
+- Update compatibility guarantees and API contract references.
+- Regenerate public API OpenAPI schemas (`docs/openapi.json`).
+- Ensure all diagnostics, setup checks, and backward compatibility contract tests pass.
+
+## [Phase 9.1] - Final API Polish and Backward Compatibility Freeze
+- Stamp every HTTP response with `X-Nesty-API-Version` response header.
+- Append `version` and `api_version` to root, `/health`, and `/ready` responses.
+- Define explicit API compatibility guarantee in `docs/COMPATIBILITY.md`.
+- Implement API contract snapshot test suite to prevent regressions.
+- Add check mechanism to OpenAPI exporter script for continuous integration.
+
+## [Phase 9.0] - API Stability, Compatibility, and SDK Prep
+- Document request and response structures for all public endpoints in `docs/API_CONTRACT.md`.
+- Establish standard JSON error payload envelope and code catalog in `docs/ERRORS.md`.
+- Provide client SDK preparation blueprints for future client development in `docs/SDK_PREP.md`.
+- Add OpenAPI JSON schema exporter script `scripts/export_openapi.py`.
+- Polish JS and Python client examples to run against the mock router environment.
+
+## [Phase 8.3] - Provider Reliability Scoring
+- Implement passive reliability scoring for providers and aliases.
+- Track success/failure latency windows and calculate confidence levels.
+- Add reliability metrics to CLI summary tools and internal admin endpoints.
+- Ensure safe database initialization and fallback paths for older SQLite runtimes.
+
+## [Phase 8.2] - Production Readiness Polish & Release Hygiene
+- Add warning-level checks for missing keys instead of raising errors during app initialization.
+- Create automated diagnostic doctor script `scripts/doctor.py`.
+- Formulate standardized pre-release checklist in `docs/RELEASE_CHECKLIST.md`.
+
 ## [Phase 8.1] - Health-Aware Routing & Diagnostics Polish
 - Add health-aware routing capabilities to route chat requests away from unhealthy providers.
 - Implement provider health summary endpoint and CLI reporting.

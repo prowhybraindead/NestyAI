@@ -97,7 +97,23 @@ def validate_required_files(project_root: Path | None = None) -> list[dict[str, 
             "message": "Both .env and .env.example are missing"
         })
 
+    # Check docs/COMPATIBILITY.md
+    compat_path = root / "docs" / "COMPATIBILITY.md"
+    if compat_path.exists():
+        results.append({
+            "name": "compatibility_doc",
+            "status": "PASS",
+            "message": "docs/COMPATIBILITY.md is present"
+        })
+    else:
+        results.append({
+            "name": "compatibility_doc",
+            "status": "WARN",
+            "message": "docs/COMPATIBILITY.md is missing. Create it to document the public API compatibility contract."
+        })
+
     return results
+
 
 
 def validate_model_chains(project_root: Path | None = None) -> list[dict[str, Any]]:

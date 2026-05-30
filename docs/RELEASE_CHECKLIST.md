@@ -4,7 +4,7 @@ Use this checklist to verify the stability, security, and setup readiness of Nes
 
 - [ ] **Run Full Test Suite**
   - Command: `python -m pytest -q`
-  - Ensure all 320+ unit and integration tests pass successfully.
+  - Ensure all 390+ unit and integration tests pass successfully.
 
 - [ ] **Run Project Doctor Script**
   - Command: `python scripts/doctor.py`
@@ -23,8 +23,9 @@ Use this checklist to verify the stability, security, and setup readiness of Nes
 
 - [ ] **Verify Base and Health Endpoints**
   - Start the app: `python run.py`
-  - Query health checks: `curl http://127.0.0.1:8000/health` (should return 200 OK).
+  - Query health checks: `curl http://127.0.0.1:8000/health` (should return 200 OK with `version` and `api_version` fields).
   - Query ready checks: `curl http://127.0.0.1:8000/ready` (should return 200 OK).
+  - Verify `X-Nesty-API-Version` header is present in all responses.
 
 - [ ] **Verify API Key Management**
   - Run the key generator: `python scripts/create_api_key.py --name test-key --env dev`
@@ -46,10 +47,16 @@ Use this checklist to verify the stability, security, and setup readiness of Nes
 - [ ] **Verify API Contracts & Error Guidelines**
   - Verify that the endpoints strictly conform to the spec in `docs/API_CONTRACT.md`.
   - Confirm error response formats and error codes align with `docs/ERRORS.md`.
+  - Review compatibility guarantees in `docs/COMPATIBILITY.md`.
 
 - [ ] **Verify OpenAPI Export**
   - Run the OpenAPI exporter script: `python scripts/export_openapi.py`
   - Confirm `docs/openapi.json` is generated successfully without error.
+  - Run the check mode: `python scripts/export_openapi.py --check` — must exit 0.
+
+- [ ] **Update `app/version.py` VERSION**
+  - Bump `VERSION` from `1.0.0-rc1` to the final release version (e.g. `1.0.0`).
+  - Re-run export_openapi.py to regenerate docs/openapi.json.
 
 - [ ] **Smoke Test Client Examples**
   - Run non-streaming example: `python examples/python/chat_non_stream.py`
@@ -59,3 +66,4 @@ Use this checklist to verify the stability, security, and setup readiness of Nes
 - [ ] **Tag Release**
   - Tag the release version: `git tag -a vX.Y.Z -m "Release version X.Y.Z"`
   - Push tags: `git push origin vX.Y.Z`
+

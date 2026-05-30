@@ -18,10 +18,12 @@ from app.api.models import router as models_router
 from app.config import Settings
 from app.core.errors import APIError, build_error_response
 from app.deps import get_settings
+from app.middleware.api_version import APIVersionHeaderMiddleware
 from app.middleware.body_size import BodySizeLimitMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.storage.db import init_db
 from app.utils.logging import get_logger
+from app.version import VERSION
 
 
 logger = get_logger("nesty.api")
@@ -68,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.add_middleware(BodySizeLimitMiddleware, max_request_body_bytes=app_settings.max_request_body_bytes)
+    app.add_middleware(APIVersionHeaderMiddleware)
 
     if app_settings.security_headers_enabled:
         app.add_middleware(SecurityHeadersMiddleware, enable_hsts=app_settings.enable_hsts)
@@ -89,8 +92,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def root() -> dict[str, str]:
         return {
             "name": app_settings.app_name,
-            "version": app_settings.app_version,
+            "version": VERSION,
             "description": "Personal AI Gateway Server",
+            "api_version": "v1",
         }
 
     app.include_router(health_router)

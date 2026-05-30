@@ -6,6 +6,7 @@ from app.core.errors import APIError
 from app.deps import get_settings
 from app.security.auth import require_api_key
 from app.storage.db import get_connection
+from app.version import VERSION
 
 
 router = APIRouter(tags=["health"])
@@ -19,7 +20,8 @@ async def health_check(request: Request) -> dict[str, str]:
     return {
         "status": "ok",
         "service": "nesty-ai",
-        "version": settings.app_version,
+        "version": VERSION,
+        "api_version": "v1",
     }
 
 
@@ -42,6 +44,7 @@ async def readiness_check(request: Request) -> dict[str, str]:
     return {
         "status": "ready",
         "service": "nesty-ai",
+        "version": VERSION,
+        "api_version": "v1",
         "database": "ok",
     }
-

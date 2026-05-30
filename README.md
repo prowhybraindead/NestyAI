@@ -10,9 +10,10 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-Production%20Ready-009688" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/tests-322%20passed-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-390%2B%20passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-orange" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/streaming-SSE-ff9800" alt="SSE" />
+  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version" />
 </p>
 
 ---
@@ -35,7 +36,7 @@ NestyAI is a **personal-first, self-hostable AI Gateway** focused on developer e
 
 Users who need enterprise capabilities are encouraged to fork, extend, and adapt the repository to their needs.
 
-Current status: **Phase 8.2 completed**.
+Current status: **Phase 10.0 complete — Gateway Core v1 Stabilization.**
 
 ---
 
@@ -272,9 +273,22 @@ Semantic recall requires:
 - **OpenAPI Schema Exporter**: Export the API schema locally using `python scripts/export_openapi.py`.
 - **Blueprints for SDKs**: SDK preparatory patterns for Python, JS/TS, and Android documented in [`docs/SDK_PREP.md`](docs/SDK_PREP.md).
 
----
+### Final API Polish and Backward Compatibility Freeze (Phase 9.1)
 
-## Internal Admin APIs
+- **Central version**: `app/version.py` exports `VERSION = "1.0.0"` and `API_VERSION = "v1"`.
+- **Version header**: All responses carry `X-Nesty-API-Version` for easy client detection.
+- **Version fields**: `/health`, `/ready`, and `/` all return `version` and `api_version` fields.
+- **OpenAPI check flag**: `python scripts/export_openapi.py --check` validates docs/openapi.json is up-to-date.
+- **Compatibility contract**: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) documents the stability guarantee and frozen v1 field list.
+- **Contract snapshot tests**: `tests/test_backward_compatibility_freeze.py` asserts all guaranteed fields exist and keep correct types.
+
+### Gateway Core v1 Stabilization (Phase 10.0)
+
+- **Release version**: Bumped `VERSION` from `1.0.0-rc1` to final `1.0.0` release.
+- **OpenAPI Schema Sync**: Regenerated and validated the public API OpenAPI schema definition (`docs/openapi.json`).
+- **Release check**: Verified all setup, doctor, and backward compatibility tests run clean.
+
+---
 
 These endpoints are **server-to-server internal APIs** and should not be exposed to browsers directly.
 
@@ -509,10 +523,11 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 - API contract specs: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)
 - Standard error spec: [`docs/ERRORS.md`](docs/ERRORS.md)
 - SDK preparation blueprints: [`docs/SDK_PREP.md`](docs/SDK_PREP.md)
+- Compatibility contract: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md)
 - Examples: [`examples/`](examples)
 
 ---
 
 ## Next Phase
 
-Recommended next target: **Phase 8.3 - Provider Reliability Scoring** (weighted health windows, alias-level score trends, safe auto-tuning hints).
+Recommended next target: **Production monitoring, Observability metrics, and alerting hooks.**
