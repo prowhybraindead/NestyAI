@@ -135,6 +135,34 @@ Conversation:
 - `POST /v1/conversations/{conversation_id}/reset-summary`
 - `GET /v1/conversations/{conversation_id}/export`
 
+## Phase 7.0: SQLite FTS Search Upgrade
+
+NestyAI now supports SQLite FTS5 for fast local message search.
+
+- `LIKE` search: simple substring matching (baseline/fallback)
+- `FTS` search: tokenized full-text search with rank + snippets
+- Future semantic search: not in Phase 7.0 (no embeddings/vector DB yet)
+
+Search backend options (`GET /v1/conversations/search`):
+
+- `backend=auto` (default): try FTS, fallback to LIKE
+- `backend=fts`: force FTS, return `fts_unavailable` if not supported
+- `backend=like`: force LIKE
+
+Rebuild FTS index:
+
+```bash
+python scripts/rebuild_fts.py
+```
+
+Optional DB path override:
+
+```bash
+python scripts/rebuild_fts.py --db data/nesty.db
+```
+
+FTS in Phase 7.0 is fully local SQLite and does not call any cloud AI service.
+
 ## Docs And Examples
 
 - Full technical documentation: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)

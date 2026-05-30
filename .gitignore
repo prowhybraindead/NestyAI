@@ -25,6 +25,9 @@ htmlcov/
 
 # Local temp folders
 tmp_script_checks/
+.tmp_test/
+.tmp_pytest/
+tests_tmp/
 
 # OS files
 .DS_Store

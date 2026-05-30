@@ -3,6 +3,11 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from app.utils.logging import get_logger, log_safe
+
+
+logger = get_logger("nesty.storage.db")
+
 
 def _resolve_db_path(db_path: str) -> Path:
     path = Path(db_path)
@@ -96,6 +101,7 @@ def init_db(db_path: str) -> None:
         _ensure_usage_logs_has_conversation_id(conn)
         _ensure_conversations_summary_columns(conn)
         conn.commit()
+    _try_init_conversation_fts(db_path)
 
 
 def _ensure_usage_logs_has_conversation_id(conn: sqlite3.Connection) -> None:
@@ -122,4 +128,17 @@ def get_connection(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(resolved, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _try_init_conversation_fts(db_path: str) -> None:
+    try:
+        from app.storage.fts import init_conversation_fts
+
+        enabled = init_conversation_fts(db_path)
+        if enabled:
+            log_safe(logger, "conversation_fts_ready", enabled=True)
+        else:
+            log_safe(logger, "conversation_fts_unavailable", enabled=False)
+    except Exception:
+        log_safe(logger, "conversation_fts_init_failed", error_code="fts_init_failed")
 

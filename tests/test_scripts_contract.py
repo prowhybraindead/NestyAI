@@ -23,6 +23,11 @@ def test_usage_summary_module_import_has_no_side_effects() -> None:
     assert callable(module.main)
 
 
+def test_rebuild_fts_module_import_has_no_side_effects() -> None:
+    module = importlib.import_module("scripts.rebuild_fts")
+    assert callable(module.main)
+
+
 def test_list_render_does_not_expose_key_hash() -> None:
     module = importlib.import_module("scripts.list_api_keys")
     lines = module.render_api_key_lines(

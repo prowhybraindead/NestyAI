@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 from app.deps import get_settings
 from app.storage.db import get_connection
+from app.storage.fts import init_conversation_fts, is_fts5_available, rebuild_conversation_fts, sync_message_to_fts
+from app.utils.logging import get_logger, log_safe
+
+
+logger = get_logger("nesty.storage.conversations")
 
 
 def _now_iso() -> str:
@@ -212,7 +218,7 @@ def add_message(
         )
         conn.commit()
 
-    return {
+    message_payload = {
         "id": message_id,
         "conversation_id": conversation_id,
         "role": role,
@@ -223,6 +229,12 @@ def add_message(
         "created_at": now,
         "metadata": metadata or None,
     }
+    try:
+        _ = sync_message_to_fts(_effective_db_path(db_path), message_payload)
+    except Exception:
+        # FTS sync failures must never block chat/message storage.
+        pass
+    return message_payload
 
 
 def get_recent_messages(
@@ -315,7 +327,18 @@ def update_conversation_title(
     with get_connection(_effective_db_path(db_path)) as conn:
         cursor = conn.execute(query, tuple(params))
         conn.commit()
-    return cursor.rowcount > 0
+    updated = cursor.rowcount > 0
+    if updated:
+        try:
+            _ = rebuild_conversation_fts(_effective_db_path(db_path))
+        except Exception:
+            log_safe(
+                logger,
+                "conversation_fts_rebuild_after_title_update_failed",
+                error_code="fts_rebuild_failed",
+                conversation_id=conversation_id,
+            )
+    return updated
 
 
 def count_messages(conversation_id: str, db_path: str | None = None) -> int:
@@ -462,6 +485,15 @@ def clear_conversation_messages(
                 (now, conversation_id),
             )
         conn.commit()
+    try:
+        _ = rebuild_conversation_fts(_effective_db_path(db_path))
+    except Exception:
+        log_safe(
+            logger,
+            "conversation_fts_rebuild_after_clear_failed",
+            error_code="fts_rebuild_failed",
+            conversation_id=conversation_id,
+        )
     return True
 
 
@@ -621,6 +653,79 @@ def search_messages(
     query: str,
     limit: int = 20,
     offset: int = 0,
+    backend: str = "auto",
+    db_path: str | None = None,
+) -> dict[str, Any]:
+    backend_mode = str(backend or "auto").strip().lower()
+    if backend_mode not in {"auto", "fts", "like"}:
+        raise ValueError("invalid_search_backend")
+
+    if backend_mode == "like":
+        data = _search_messages_like(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit,
+            offset=offset,
+            db_path=db_path,
+        )
+        return {
+            "data": data,
+            "backend": "like",
+            "fallback_used": False,
+        }
+
+    if backend_mode == "fts":
+        if not is_fts5_available(_effective_db_path(db_path)):
+            raise RuntimeError("fts_unavailable")
+        data = _search_messages_fts(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit,
+            offset=offset,
+            db_path=db_path,
+        )
+        return {
+            "data": data,
+            "backend": "fts",
+            "fallback_used": False,
+        }
+
+    try:
+        if not is_fts5_available(_effective_db_path(db_path)):
+            raise RuntimeError("fts_unavailable")
+        data = _search_messages_fts(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit,
+            offset=offset,
+            db_path=db_path,
+        )
+        return {
+            "data": data,
+            "backend": "fts",
+            "fallback_used": False,
+        }
+    except Exception:
+        log_safe(logger, "conversation_search_fallback_like", query_length=len(query))
+        data = _search_messages_like(
+            api_key_id=api_key_id,
+            query=query,
+            limit=limit,
+            offset=offset,
+            db_path=db_path,
+        )
+        return {
+            "data": data,
+            "backend": "like",
+            "fallback_used": True,
+        }
+
+
+def _search_messages_like(
+    api_key_id: str | None,
+    query: str,
+    limit: int,
+    offset: int,
     db_path: str | None = None,
 ) -> list[dict[str, Any]]:
     sql = """
@@ -664,7 +769,81 @@ def search_messages(
             "provider": row["provider"],
             "token_count": int(row["token_count"] or 0),
             "created_at": row["created_at"],
+            "rank": None,
+            "snippet": None,
+            "search_backend": "like",
             "metadata": _parse_metadata(row["metadata"]),
         }
         for row in rows
     ]
+
+
+def _search_messages_fts(
+    api_key_id: str | None,
+    query: str,
+    limit: int,
+    offset: int,
+    db_path: str | None = None,
+) -> list[dict[str, Any]]:
+    if not init_conversation_fts(_effective_db_path(db_path)):
+        raise RuntimeError("fts_unavailable")
+
+    fts_query = _normalize_fts_query(query)
+    sql = """
+        SELECT
+            m.id,
+            m.conversation_id,
+            m.role,
+            m.content,
+            m.model,
+            m.provider,
+            m.token_count,
+            m.created_at,
+            m.metadata,
+            c.title AS conversation_title,
+            bm25(conversation_messages_fts) AS rank,
+            snippet(conversation_messages_fts, 4, '[', ']', '...', 16) AS snippet
+        FROM conversation_messages_fts
+        JOIN conversation_messages m ON m.id = conversation_messages_fts.message_id
+        JOIN conversations c ON c.id = m.conversation_id
+        WHERE conversation_messages_fts MATCH ? AND c.archived_at IS NULL
+    """
+    params: list[Any] = [fts_query]
+    if api_key_id is None:
+        sql += " AND c.api_key_id IS NULL"
+    else:
+        sql += " AND c.api_key_id = ?"
+        params.append(api_key_id)
+    sql += " ORDER BY rank ASC, m.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([max(1, int(limit)), max(0, int(offset))])
+
+    with get_connection(_effective_db_path(db_path)) as conn:
+        rows = conn.execute(sql, tuple(params)).fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "conversation_id": row["conversation_id"],
+            "conversation_title": row["conversation_title"],
+            "role": row["role"],
+            "content": row["content"],
+            "model": row["model"],
+            "provider": row["provider"],
+            "token_count": int(row["token_count"] or 0),
+            "created_at": row["created_at"],
+            "rank": float(row["rank"]) if row["rank"] is not None else None,
+            "snippet": str(row["snippet"] or ""),
+            "search_backend": "fts",
+            "metadata": _parse_metadata(row["metadata"]),
+        }
+        for row in rows
+    ]
+
+
+def _normalize_fts_query(query: str) -> str:
+    raw = str(query or "").strip()
+    tokens = [token for token in re.split(r"\s+", raw) if token]
+    if not tokens:
+        return '""'
+    escaped = [token.replace('"', '""') for token in tokens]
+    return " AND ".join(f'"{token}"' for token in escaped)

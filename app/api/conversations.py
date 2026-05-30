@@ -162,6 +162,7 @@ async def search_conversations_endpoint(
     limit: int = 20,
     offset: int = 0,
     scope: str = "all",
+    backend: str = "auto",
 ) -> dict:
     settings = get_settings()
     auth_context = _resolve_auth_context(settings, request)
@@ -176,10 +177,19 @@ async def search_conversations_endpoint(
             message="Invalid search scope.",
             status_code=400,
         )
+    backend_mode = backend.strip().lower()
+    if backend_mode not in {"auto", "fts", "like"}:
+        raise APIError(
+            code="invalid_search_backend",
+            message="Search backend must be one of: auto, fts, like.",
+            status_code=400,
+        )
 
     conversations_data: list[dict] = []
     messages_data: list[dict] = []
     has_more = False
+    message_backend_used = "like"
+    message_fallback_used = False
 
     if scope_mode in {"conversations", "all"}:
         rows = search_conversations(
@@ -194,21 +204,47 @@ async def search_conversations_endpoint(
         conversations_data = rows[:limit]
 
     if scope_mode in {"messages", "all"}:
-        rows = search_messages(
-            api_key_id=api_key_id,
-            query=query,
-            limit=limit + 1,
-            offset=offset,
-            db_path=settings.nesty_db_path,
-        )
+        try:
+            message_result = search_messages(
+                api_key_id=api_key_id,
+                query=query,
+                limit=limit + 1,
+                offset=offset,
+                backend=backend_mode,
+                db_path=settings.nesty_db_path,
+            )
+        except ValueError:
+            raise APIError(
+                code="invalid_search_backend",
+                message="Search backend must be one of: auto, fts, like.",
+                status_code=400,
+            )
+        except RuntimeError as exc:
+            if str(exc) == "fts_unavailable":
+                raise APIError(
+                    code="fts_unavailable",
+                    message="SQLite FTS5 search is not available.",
+                    status_code=503,
+                )
+            raise
+
+        rows = message_result["data"]
         has_more = has_more or len(rows) > limit
         messages_data = rows[:limit]
+        message_backend_used = str(message_result.get("backend") or "like")
+        message_fallback_used = bool(message_result.get("fallback_used"))
 
     return {
         "object": "conversation.search_results",
         "query": query,
         "conversations": conversations_data,
         "messages": messages_data,
+        "search": {
+            "backend": message_backend_used if scope_mode in {"messages", "all"} else backend_mode,
+            "fallback_used": message_fallback_used if scope_mode in {"messages", "all"} else False,
+            "query": query,
+            "scope": scope_mode,
+        },
         "pagination": {
             "limit": limit,
             "offset": offset,

@@ -39,6 +39,9 @@ ERROR_CODES = {
     "invalid_summary_mode",
     "conversation_export_failed",
     "conversation_clear_failed",
+    "fts_unavailable",
+    "fts_rebuild_failed",
+    "invalid_search_backend",
 }
 
 
