@@ -52,6 +52,10 @@ ERROR_CODES = {
     "model_config_invalid",
     "model_config_update_failed",
     "model_config_test_failed",
+    "embedding_provider_unavailable",
+    "embedding_generation_failed",
+    "embedding_storage_failed",
+    "embedding_config_invalid",
 }
 
 

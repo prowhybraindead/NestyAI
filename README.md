@@ -10,7 +10,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-Production%20Ready-009688" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/tests-205%20passed-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-213%2B%20passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-orange" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/streaming-SSE-ff9800" alt="SSE" />
 </p>
@@ -303,6 +303,41 @@ Runtime override compatibility:
 - Effective runtime config remains: `YAML default + active SQLite override`.
 - Provider availability and free-model limits can change over time; tune via internal overrides when needed.
 
+## Phase 7.1: Embedding Provider Abstraction
+
+Phase 7.1 adds embedding infrastructure only (foundation stage), without semantic recall injection yet.
+
+- FTS search: keyword/token-based search over stored conversation text (already active).
+- Embedding generation: converts text into vectors for future retrieval capabilities.
+- Semantic recall: not enabled yet in this phase (no vector similarity retrieval in chat flow).
+
+Environment flags:
+
+```bash
+EMBEDDINGS_ENABLED=false
+EMBEDDINGS_PROVIDER=openrouter
+EMBEDDINGS_MODEL=nvidia/llama-nemotron-embed-vl-1b-v2:free
+EMBEDDINGS_DIMENSIONS=
+EMBEDDINGS_TIMEOUT_SECONDS=30
+EMBEDDINGS_MAX_INPUT_CHARS=8000
+EMBEDDINGS_STORE_MESSAGE_EMBEDDINGS=false
+EMBEDDINGS_BACKFILL_BATCH_SIZE=50
+```
+
+Scripts:
+
+```bash
+python scripts/test_embedding_provider.py
+python scripts/rebuild_embeddings.py
+```
+
+Privacy and scope notes:
+
+- Embeddings are generated from sanitized stored messages only when enabled.
+- Embeddings are disabled by default.
+- No semantic recall injection into prompts yet.
+- Candidate embedding model `nvidia/llama-nemotron-embed-vl-1b-v2:free` is used only by embedding subsystem, not chat provider chains.
+
 ## Docs And Examples
 
 - Full technical documentation: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)
@@ -312,7 +347,7 @@ Runtime override compatibility:
 
 ## Quality Status
 
-- Test suite: **205 passed**
+- Test suite: **213+ passed**
 - Streaming contract: enabled
 - Conversation controls/search: enabled
 

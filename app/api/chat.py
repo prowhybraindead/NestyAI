@@ -6,6 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.conversation_summarizer import summarize_conversation
+from app.core.embedding_service import maybe_embed_conversation_message
 from app.core.errors import APIError
 from app.deps import get_guard_rules, get_orchestrator, get_settings
 from app.guards.input_guard import InputGuard
@@ -73,7 +74,7 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
     if request.stream:
         try:
             if request.store and conversation_id and sanitized_user_for_storage:
-                add_message(
+                user_message = add_message(
                     conversation_id=conversation_id,
                     role="user",
                     content=sanitized_user_for_storage,
@@ -81,6 +82,10 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
                     provider=None,
                     metadata={"request_id": request_id, "stream": True},
                     db_path=settings.nesty_db_path,
+                )
+                await _best_effort_embed_message(
+                    message=user_message,
+                    api_key_id=auth_context.api_key_id if auth_context else None,
                 )
             stream_handle = await orchestrator.create_chat_completion_stream(request_id=request_id, request=request)
         except APIError as exc:
@@ -131,7 +136,7 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
                     and stream_handle.outcome.status == "success"
                     and stream_handle.outcome.assistant_content.strip()
                 ):
-                    add_message(
+                    assistant_message = add_message(
                         conversation_id=conversation_id,
                         role="assistant",
                         content=stream_handle.outcome.assistant_content,
@@ -139,6 +144,10 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
                         provider=stream_handle.outcome.provider,
                         metadata={"request_id": request_id, "stream": True},
                         db_path=settings.nesty_db_path,
+                    )
+                    await _best_effort_embed_message(
+                        message=assistant_message,
+                        api_key_id=auth_context.api_key_id if auth_context else None,
                     )
                     _ = await _maybe_run_conversation_summary(
                         settings=settings,
@@ -177,7 +186,7 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
         status = "success"
 
         if request.store and conversation_id:
-            add_message(
+            user_message = add_message(
                 conversation_id=conversation_id,
                 role="user",
                 content=sanitized_user_for_storage,
@@ -186,10 +195,14 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
                 metadata={"request_id": request_id, "stream": False},
                 db_path=settings.nesty_db_path,
             )
+            await _best_effort_embed_message(
+                message=user_message,
+                api_key_id=auth_context.api_key_id if auth_context else None,
+            )
             assistant_content = response.choices[0].message.content if response.choices else ""
             summary_updated = False
             if assistant_content.strip():
-                add_message(
+                assistant_message = add_message(
                     conversation_id=conversation_id,
                     role="assistant",
                     content=assistant_content,
@@ -197,6 +210,10 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
                     provider=response.provider,
                     metadata={"request_id": request_id, "stream": False},
                     db_path=settings.nesty_db_path,
+                )
+                await _best_effort_embed_message(
+                    message=assistant_message,
+                    api_key_id=auth_context.api_key_id if auth_context else None,
                 )
                 summary_updated = await _maybe_run_conversation_summary(
                     settings=settings,
@@ -507,3 +524,10 @@ def _safe_log_usage(
         )
     except Exception:
         pass
+
+
+async def _best_effort_embed_message(message: dict, api_key_id: str | None) -> None:
+    try:
+        _ = await maybe_embed_conversation_message(message=message, api_key_id=api_key_id)
+    except Exception:
+        return

@@ -134,6 +134,40 @@ def init_db(db_path: str) -> None:
             "CREATE INDEX IF NOT EXISTS idx_model_config_audit_model_id_created "
             "ON model_config_audit_logs(model_id, created_at)"
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS embedding_records (
+                id TEXT PRIMARY KEY,
+                owner_type TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                api_key_id TEXT DEFAULT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                dimensions INTEGER DEFAULT NULL,
+                content_hash TEXT NOT NULL,
+                embedding_json TEXT NOT NULL,
+                metadata TEXT DEFAULT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_embedding_records_owner "
+            "ON embedding_records(owner_type, owner_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_embedding_records_api_key_owner "
+            "ON embedding_records(api_key_id, owner_type)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_embedding_records_provider_model "
+            "ON embedding_records(provider, model)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_embedding_records_content_hash "
+            "ON embedding_records(content_hash)"
+        )
         _ensure_usage_logs_has_conversation_id(conn)
         _ensure_conversations_summary_columns(conn)
         conn.commit()

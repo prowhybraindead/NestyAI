@@ -70,6 +70,14 @@ class Settings(BaseModel):
     nesty_pro_orchestration_include_role_latency: bool = True
     internal_admin_enabled: bool = False
     nesty_internal_admin_token: str | None = None
+    embeddings_enabled: bool = False
+    embeddings_provider: str = "openrouter"
+    embeddings_model: str = "nvidia/llama-nemotron-embed-vl-1b-v2:free"
+    embeddings_dimensions: int | None = None
+    embeddings_timeout_seconds: float = 30.0
+    embeddings_max_input_chars: int = 8000
+    embeddings_store_message_embeddings: bool = False
+    embeddings_backfill_batch_size: int = 50
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -135,6 +143,18 @@ class Settings(BaseModel):
             ),
             internal_admin_enabled=_to_bool(os.getenv("INTERNAL_ADMIN_ENABLED"), False),
             nesty_internal_admin_token=os.getenv("NESTY_INTERNAL_ADMIN_TOKEN"),
+            embeddings_enabled=_to_bool(os.getenv("EMBEDDINGS_ENABLED"), False),
+            embeddings_provider=os.getenv("EMBEDDINGS_PROVIDER", "openrouter"),
+            embeddings_model=os.getenv("EMBEDDINGS_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2:free"),
+            embeddings_dimensions=(
+                int(os.getenv("EMBEDDINGS_DIMENSIONS", "").strip())
+                if str(os.getenv("EMBEDDINGS_DIMENSIONS", "")).strip()
+                else None
+            ),
+            embeddings_timeout_seconds=float(os.getenv("EMBEDDINGS_TIMEOUT_SECONDS", "30")),
+            embeddings_max_input_chars=int(os.getenv("EMBEDDINGS_MAX_INPUT_CHARS", "8000")),
+            embeddings_store_message_embeddings=_to_bool(os.getenv("EMBEDDINGS_STORE_MESSAGE_EMBEDDINGS"), False),
+            embeddings_backfill_batch_size=int(os.getenv("EMBEDDINGS_BACKFILL_BATCH_SIZE", "50")),
         )
 
 
