@@ -10,7 +10,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-Production%20Ready-009688" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/tests-253%2B%20passed-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-322%20passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-orange" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/streaming-SSE-ff9800" alt="SSE" />
 </p>
@@ -19,16 +19,23 @@
 
 ## Overview
 
-NestyAI is a personal AI gateway focused on:
+NestyAI is a **personal-first, self-hostable AI Gateway** focused on developer experience and light, robust local-first deployments.
 
-- OpenAI-style chat compatibility (`POST /v1/chat/completions`)
-- provider routing + fallback
-- strong guardrails and production hardening
-- conversation memory, summary, search, and controls
-- optional embeddings + semantic recall foundation
-- deterministic local-first architecture (SQLite)
+### What NestyAI Is:
+- A personal/local-first OpenAI-compatible proxy (`POST /v1/chat/completions`)
+- A deterministic router with automatic failover between Groq, OpenRouter, and NVIDIA
+- A safety-first gatekeeper featuring `InputGuard`, `ContextGuard`, and `OutputGuard`
+- A conversation memory keeper using local SQLite FTS5 for message search and summaries
+- An optional local semantic recall platform using in-DB cosine similarity calculations
 
-Current status: **Phase 8.1 completed**.
+### What NestyAI Is Not:
+- An enterprise-scale gateway out of the box (no built-in OAuth/multi-tenancy/billing/dashboard UI)
+- An integration with external high-performance vector databases (keeps all vectors in SQLite)
+- A high-throughput proxy for large teams without custom tuning or database pooling
+
+Users who need enterprise capabilities are encouraged to fork, extend, and adapt the repository to their needs.
+
+Current status: **Phase 8.2 completed**.
 
 ---
 
@@ -75,7 +82,15 @@ Set at least one provider key:
 - `OPENROUTER_API_KEY`
 - `NVIDIA_API_KEY` (optional)
 
-### 3) Run
+### 3) Diagnose Setup
+
+Verify that files, environment variables, database connectivity, and FTS5 capabilities are working:
+
+```bash
+python scripts/doctor.py
+```
+
+### 4) Run
 
 ```bash
 python run.py
@@ -416,9 +431,6 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 ---
 
 ## API Surface
-
-### Public
-
 - `GET /health`
 - `GET /ready`
 - `GET /v1/models`
@@ -444,7 +456,7 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 
 ## Quality Status
 
-- test suite: **304 passed**
+- test suite: **322 passed**
 - streaming SSE contract: enabled
 - FTS fallback behavior: enabled
 - semantic recall: optional, disabled by default
@@ -465,10 +477,12 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 ## Docs
 
 - Technical notes: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)
+- Deployment guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- Release checklist: [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)
 - Examples: [`examples/`](examples)
 
 ---
 
 ## Next Phase
 
-Recommended next target: **Phase 8.2 - Provider Reliability Scoring** (weighted health windows, alias-level score trends, safe auto-tuning hints).
+Recommended next target: **Phase 8.3 - Provider Reliability Scoring** (weighted health windows, alias-level score trends, safe auto-tuning hints).
