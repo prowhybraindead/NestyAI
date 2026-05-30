@@ -191,6 +191,67 @@ Quota note:
 
 - Nesty Pro multi-model synthesis can consume multiple internal provider calls for one user request.
 
+## Phase 7.0b: Orchestration Controls And Cost Safety
+
+Nesty Pro orchestration now supports per-request controls:
+
+- `orchestration=auto` (default): run orchestration only when request complexity is high enough.
+- `orchestration=off`: always use single-provider path for this request.
+- `orchestration=force`: force orchestration for non-streaming Nesty Pro (if globally enabled).
+
+Cost-safety behavior:
+
+- `auto` skips orchestration for simple prompts.
+- Reduced flow is used for moderate complexity: `planner -> finalizer`.
+- Full flow is used for higher complexity (and enough internal-call budget): `planner -> researcher -> critic -> finalizer`.
+- `stream=true` never runs multi-model orchestration.
+
+Environment controls:
+
+```bash
+NESTY_PRO_ORCHESTRATION_ENABLED=true
+NESTY_PRO_ORCHESTRATION_MAX_INTERNAL_CALLS=4
+NESTY_PRO_ORCHESTRATION_COMPLEXITY_MIN_SCORE=2
+NESTY_PRO_ORCHESTRATION_SIMPLE_MAX_CHARS=220
+NESTY_PRO_ORCHESTRATION_MAX_CONTEXT_CHARS=12000
+NESTY_PRO_ORCHESTRATION_ROLE_TIMEOUT_SECONDS=30
+NESTY_PRO_ORCHESTRATION_INCLUDE_ROLE_LATENCY=true
+NESTY_PRO_ORCHESTRATION_DEBUG=false
+```
+
+Examples:
+
+Nesty Pro auto:
+
+```json
+{
+  "model": "nesty-pro-1.0",
+  "messages": [{"role": "user", "content": "Analyze this architecture and suggest improvements..."}],
+  "orchestration": "auto",
+  "stream": false
+}
+```
+
+Nesty Pro off:
+
+```json
+{
+  "model": "nesty-pro-1.0",
+  "messages": [{"role": "user", "content": "Quick answer please"}],
+  "orchestration": "off"
+}
+```
+
+Nesty Pro force:
+
+```json
+{
+  "model": "nesty-pro-1.0",
+  "messages": [{"role": "user", "content": "Review this complex debugging issue..."}],
+  "orchestration": "force"
+}
+```
+
 ## Docs And Examples
 
 - Full technical documentation: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)

@@ -63,6 +63,11 @@ class Settings(BaseModel):
     nesty_pro_orchestration_enabled: bool = True
     nesty_pro_orchestration_max_internal_calls: int = 4
     nesty_pro_orchestration_debug: bool = False
+    nesty_pro_orchestration_complexity_min_score: int = 2
+    nesty_pro_orchestration_simple_max_chars: int = 220
+    nesty_pro_orchestration_max_context_chars: int = 12000
+    nesty_pro_orchestration_role_timeout_seconds: float = 30.0
+    nesty_pro_orchestration_include_role_latency: bool = True
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -111,6 +116,21 @@ class Settings(BaseModel):
                 os.getenv("NESTY_PRO_ORCHESTRATION_MAX_INTERNAL_CALLS", "4")
             ),
             nesty_pro_orchestration_debug=_to_bool(os.getenv("NESTY_PRO_ORCHESTRATION_DEBUG"), False),
+            nesty_pro_orchestration_complexity_min_score=int(
+                os.getenv("NESTY_PRO_ORCHESTRATION_COMPLEXITY_MIN_SCORE", "2")
+            ),
+            nesty_pro_orchestration_simple_max_chars=int(
+                os.getenv("NESTY_PRO_ORCHESTRATION_SIMPLE_MAX_CHARS", "220")
+            ),
+            nesty_pro_orchestration_max_context_chars=int(
+                os.getenv("NESTY_PRO_ORCHESTRATION_MAX_CONTEXT_CHARS", "12000")
+            ),
+            nesty_pro_orchestration_role_timeout_seconds=float(
+                os.getenv("NESTY_PRO_ORCHESTRATION_ROLE_TIMEOUT_SECONDS", "30")
+            ),
+            nesty_pro_orchestration_include_role_latency=_to_bool(
+                os.getenv("NESTY_PRO_ORCHESTRATION_INCLUDE_ROLE_LATENCY"), True
+            ),
         )
 
 

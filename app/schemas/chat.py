@@ -19,6 +19,7 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     search: str = "auto"
     tools: str | list[str] = "auto"
+    orchestration: str = "auto"
     conversation_id: str | None = None
     store: bool = False
     summary: str = "auto"
@@ -62,11 +63,15 @@ class ConversationInfo(BaseModel):
 
 class OrchestrationInfo(BaseModel):
     enabled: bool = False
+    requested: str = "auto"
     used: bool = False
     mode: str = "single"
+    decision_reason: str | None = None
+    complexity_score: int = 0
     roles: list[str] = Field(default_factory=list)
     fallback_used: bool = False
     internal_calls: int = 0
+    role_latency_ms: dict[str, int] | None = None
     reason: str | None = None
 
 

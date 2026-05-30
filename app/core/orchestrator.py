@@ -8,7 +8,7 @@ from typing import Any
 from app.config import ModelsConfig, Settings
 from app.core.errors import APIError
 from app.core.model_behavior import apply_behavior_defaults, build_behavior_system_instruction
-from app.core.multi_model_orchestrator import NestyProMultiModelOrchestrator
+from app.core.multi_model_orchestrator import NestyProMultiModelOrchestrator, should_use_orchestration
 from app.core.prompt_builder import (
     append_behavior_instruction,
     append_external_context,
@@ -90,7 +90,6 @@ class ChatOrchestrator:
         self.logger = logger
         self.multi_model_orchestrator = NestyProMultiModelOrchestrator(
             router=self.router,
-            max_internal_calls=self.settings.nesty_pro_orchestration_max_internal_calls,
         )
 
     async def create_chat_completion(
@@ -123,12 +122,25 @@ class ChatOrchestrator:
         )
 
         try:
-            orchestration = self._default_orchestration_info(model_alias=request.model, stream=False)
+            context_metadata = self._build_orchestration_context_metadata(
+                request=request,
+                messages=messages,
+                tools_meta=tools_meta,
+                sources=sources,
+            )
+            decision = should_use_orchestration(
+                model_alias=request.model,
+                request=request,
+                model_config=model_profile_obj.model_dump(),
+                context_metadata=context_metadata,
+                config=self.settings,
+            )
+            orchestration = self._orchestration_info_from_decision(decision)
             response_text = ""
             provider_used = ""
             usage = Usage()
 
-            if self._should_use_multi_model(request=request, model_profile=model_profile_obj.model_dump()):
+            if decision.get("should_use"):
                 try:
                     synthesis = await self.multi_model_orchestrator.run(
                         request_id=request_id,
@@ -136,8 +148,13 @@ class ChatOrchestrator:
                         prepared_messages=messages,
                         model_alias=request.model,
                         model_profile=model_profile_obj,
+                        selected_roles=list(decision.get("roles") or []),
                         temperature=request.temperature,
                         max_tokens=request.max_tokens,
+                        role_timeout_seconds=self.settings.nesty_pro_orchestration_role_timeout_seconds,
+                        max_context_chars=self.settings.nesty_pro_orchestration_max_context_chars,
+                        include_role_latency=self.settings.nesty_pro_orchestration_include_role_latency,
+                        context_metadata=context_metadata,
                     )
                     response_text = synthesis.content
                     provider_used = synthesis.provider
@@ -147,21 +164,30 @@ class ChatOrchestrator:
                         total_tokens=synthesis.usage.total_tokens,
                     )
                     orchestration = OrchestrationInfo(
-                        enabled=True,
+                        enabled=bool(decision.get("enabled")),
+                        requested=str(decision.get("requested") or request.orchestration),
                         used=True,
                         mode="multi_model_synthesis",
+                        decision_reason=str(decision.get("reason") or "complex_request"),
+                        complexity_score=int(decision.get("complexity_score") or 0),
                         roles=synthesis.roles,
                         fallback_used=False,
                         internal_calls=synthesis.internal_calls,
+                        role_latency_ms=synthesis.role_latency_ms or None,
+                        reason=None,
                     )
                 except Exception:
                     orchestration = OrchestrationInfo(
-                        enabled=True,
+                        enabled=bool(decision.get("enabled")),
+                        requested=str(decision.get("requested") or request.orchestration),
                         used=False,
-                        mode="multi_model_synthesis",
-                        roles=[],
+                        mode="single",
+                        decision_reason=str(decision.get("reason") or "complex_request"),
+                        complexity_score=int(decision.get("complexity_score") or 0),
+                        roles=list(decision.get("roles") or []),
                         fallback_used=True,
                         internal_calls=0,
+                        role_latency_ms=None,
                         reason="fallback_to_single_model",
                     )
 
@@ -246,6 +272,19 @@ class ChatOrchestrator:
             request=request,
             tools_mode=tools_mode,
         )
+        context_metadata = self._build_orchestration_context_metadata(
+            request=request,
+            messages=messages,
+            tools_meta=tools_meta,
+            sources=sources,
+        )
+        decision = should_use_orchestration(
+            model_alias=request.model,
+            request=request,
+            model_config=model_profile_obj.model_dump(),
+            context_metadata=context_metadata,
+            config=self.settings,
+        )
 
         stream_result = await self.router.route_chat_stream(
             request_id=request_id,
@@ -266,7 +305,7 @@ class ChatOrchestrator:
             conversation_summary_mode=request.conversation_summary_mode if request.store else "auto",
             conversation_summary_used=request.conversation_summary_used if request.store else False,
             conversation_summary_updated=request.conversation_summary_updated if request.store else False,
-            orchestration=self._default_orchestration_info(model_alias=request.model, stream=True),
+            orchestration=self._orchestration_info_from_decision(decision),
         )
 
         async def stream_events() -> AsyncIterator[str]:
@@ -413,6 +452,13 @@ class ChatOrchestrator:
             raise APIError(
                 code="invalid_search_mode",
                 message="Search mode must be one of: auto, on, off.",
+                status_code=400,
+            )
+        orchestration_mode = str(request.orchestration or "auto").strip().lower()
+        if orchestration_mode not in {"auto", "off", "force"}:
+            raise APIError(
+                code="invalid_orchestration_mode",
+                message="Orchestration mode must be one of: auto, off, force.",
                 status_code=400,
             )
         return self._normalize_tools_mode(request.tools)
@@ -718,40 +764,46 @@ class ChatOrchestrator:
             categories=combined_categories,
         )
 
-    def _should_use_multi_model(self, request: ChatCompletionRequest, model_profile: dict[str, Any]) -> bool:
-        if request.stream:
-            return False
-        if request.model != "nesty-pro-1.0":
-            return False
-        if not self.settings.nesty_pro_orchestration_enabled:
-            return False
-        if not bool(model_profile.get("orchestration_enabled", False)):
-            return False
-        return str(model_profile.get("orchestration_mode", "single")).strip().lower() == "multi_model_synthesis"
+    def _build_orchestration_context_metadata(
+        self,
+        request: ChatCompletionRequest,
+        messages: list[ChatMessage],
+        tools_meta: ToolMetadata,
+        sources: list[SourceItem],
+    ) -> dict[str, Any]:
+        summary_text = ""
+        for item in messages:
+            if item.role != "system":
+                continue
+            if "Conversation summary so far" in item.content:
+                summary_text = item.content[:2000]
+                break
+        return {
+            "latest_user_message": self._latest_user_message(messages),
+            "search_enabled": bool(tools_meta.search.enabled),
+            "tools_used_count": len(tools_meta.used),
+            "sources_count": len(sources),
+            "conversation_summary_used": bool(request.conversation_summary_used),
+            "has_conversation_context": bool(request.store and request.conversation_id),
+            "conversation_summary_text": summary_text,
+        }
 
-    def _default_orchestration_info(self, model_alias: str, stream: bool) -> OrchestrationInfo:
-        profile = self.models_config.models.get(model_alias)
-        profile_dict = profile.model_dump() if profile else {}
-        profile_enabled = bool(profile_dict.get("orchestration_enabled", False))
-        enabled = bool(self.settings.nesty_pro_orchestration_enabled and profile_enabled and model_alias == "nesty-pro-1.0")
-        if stream and enabled:
-            return OrchestrationInfo(
-                enabled=True,
-                used=False,
-                mode="single_stream",
-                roles=[],
-                fallback_used=False,
-                internal_calls=0,
-                reason="streaming_not_supported_for_multi_model",
-            )
+    @staticmethod
+    def _orchestration_info_from_decision(decision: dict[str, Any]) -> OrchestrationInfo:
+        reason = str(decision.get("reason") or "")
+        requested = str(decision.get("requested") or "auto")
         return OrchestrationInfo(
-            enabled=enabled,
+            enabled=bool(decision.get("enabled")),
+            requested=requested,
             used=False,
-            mode="single",
-            roles=[],
+            mode=str(decision.get("mode") or "single"),
+            decision_reason=reason or None,
+            complexity_score=int(decision.get("complexity_score") or 0),
+            roles=list(decision.get("roles") or []),
             fallback_used=False,
             internal_calls=0,
-            reason=None,
+            role_latency_ms=None,
+            reason=reason or None,
         )
 
     @staticmethod

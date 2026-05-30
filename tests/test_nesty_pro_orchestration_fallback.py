@@ -99,6 +99,7 @@ async def test_nesty_pro_orchestration_falls_back_to_single_model() -> None:
             nesty_pro_orchestration_enabled=True,
             nesty_pro_orchestration_max_internal_calls=4,
             nesty_pro_orchestration_debug=False,
+            nesty_pro_orchestration_complexity_min_score=1,
         ),
         enable_input_guard=True,
         enable_output_guard=True,
@@ -106,19 +107,22 @@ async def test_nesty_pro_orchestration_falls_back_to_single_model() -> None:
     )
     request = ChatCompletionRequest(
         model="nesty-pro-1.0",
-        messages=[ChatMessage(role="user", content="fallback case")],
+        messages=[ChatMessage(role="user", content="analyze this fallback case deeply")],
         search="off",
         tools="off",
         stream=False,
+        orchestration="force",
     )
     response = await orchestrator.create_chat_completion("req_pro_fallback", request)
     assert response.provider == "fallback"
     assert response.choices[0].message.content == "single fallback answer"
     assert response.orchestration is not None
     assert response.orchestration.enabled is True
+    assert response.orchestration.requested == "force"
     assert response.orchestration.used is False
     assert response.orchestration.fallback_used is True
-    assert response.orchestration.mode == "multi_model_synthesis"
+    assert response.orchestration.mode == "single"
+    assert response.orchestration.decision_reason == "request_force"
     assert response.orchestration.reason == "fallback_to_single_model"
     assert router.generate_calls >= 1
     assert router.route_chat_calls == 1

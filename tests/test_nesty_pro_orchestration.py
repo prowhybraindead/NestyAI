@@ -116,6 +116,7 @@ def _build_orchestrator(router: _ProRouter) -> ChatOrchestrator:
             nesty_pro_orchestration_enabled=True,
             nesty_pro_orchestration_max_internal_calls=4,
             nesty_pro_orchestration_debug=False,
+            nesty_pro_orchestration_complexity_min_score=2,
         ),
         enable_input_guard=True,
         enable_output_guard=True,
@@ -129,7 +130,7 @@ async def test_nesty_pro_non_stream_uses_multi_model_orchestration() -> None:
     orchestrator = _build_orchestrator(router)
     request = ChatCompletionRequest(
         model="nesty-pro-1.0",
-        messages=[ChatMessage(role="user", content="plan architecture")],
+        messages=[ChatMessage(role="user", content="Analyze, compare, debug architecture and verify design plan")],
         search="off",
         tools="off",
         stream=False,
@@ -139,6 +140,8 @@ async def test_nesty_pro_non_stream_uses_multi_model_orchestration() -> None:
     assert response.orchestration.enabled is True
     assert response.orchestration.used is True
     assert response.orchestration.mode == "multi_model_synthesis"
+    assert response.orchestration.requested == "auto"
+    assert response.orchestration.decision_reason == "complex_request"
     assert response.orchestration.internal_calls == 4
     assert response.orchestration.roles == ["planner", "researcher", "critic", "finalizer"]
     assert response.provider == "internal"
@@ -159,6 +162,7 @@ async def test_nesty_pro_stream_does_not_use_multi_model_orchestration() -> None
     )
     handle = await orchestrator.create_chat_completion_stream("req_pro_stream", request)
     assert handle.outcome.orchestration.enabled is True
+    assert handle.outcome.orchestration.requested == "auto"
     assert handle.outcome.orchestration.used is False
     assert handle.outcome.orchestration.mode == "single_stream"
-    assert handle.outcome.orchestration.reason == "streaming_not_supported_for_multi_model"
+    assert handle.outcome.orchestration.decision_reason == "streaming_not_supported"

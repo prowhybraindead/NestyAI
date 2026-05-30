@@ -44,6 +44,8 @@ ERROR_CODES = {
     "invalid_search_backend",
     "model_behavior_config_invalid",
     "orchestration_failed",
+    "invalid_orchestration_mode",
+    "orchestration_not_available",
 }
 
 
