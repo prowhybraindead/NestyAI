@@ -20,11 +20,17 @@ models:
       - "package_version_lookup"
     max_search_results: 3
     max_context_chars: 2000
+    # Phase 7.0d defaults are personal-chat-focused and can be overridden at runtime
+    # via the internal model-config API (Phase 7.0c).
     provider_chain:
       - provider: "groq"
         model: "llama-3.1-8b-instant"
       - provider: "openrouter"
-        model: "qwen/qwen3-14b:free"
+        model: "google/gemma-4-26b-a4b-it:free"
+      - provider: "openrouter"
+        model: "deepseek/deepseek-v4-flash:free"
+      - provider: "nvidia"
+        model: "default"
 
   nesty-combined-1.0:
     display_name: "Nesty Combined 1.0"
@@ -51,10 +57,14 @@ models:
     max_search_results: 5
     max_context_chars: 6000
     provider_chain:
+      - provider: "openrouter"
+        model: "deepseek/deepseek-v4-flash:free"
+      - provider: "openrouter"
+        model: "moonshotai/kimi-k2.6:free"
+      - provider: "openrouter"
+        model: "openai/gpt-oss-120b:free"
       - provider: "groq"
         model: "llama-3.3-70b-versatile"
-      - provider: "openrouter"
-        model: "qwen/qwen3-32b:free"
       - provider: "nvidia"
         model: "default"
 
@@ -84,29 +94,47 @@ models:
     max_context_chars: 12000
     provider_chain:
       - provider: "openrouter"
-        model: "deepseek/deepseek-r1:free"
-      - provider: "nvidia"
-        model: "deepseek-ai/deepseek-r1"
+        model: "deepseek/deepseek-v4-flash:free"
       - provider: "groq"
         model: "llama-3.3-70b-versatile"
+      - provider: "openrouter"
+        model: "moonshotai/kimi-k2.6:free"
+      - provider: "nvidia"
+        model: "default"
     orchestration_roles:
       planner:
         provider_chain:
           - provider: "groq"
             model: "llama-3.1-8b-instant"
+          - provider: "openrouter"
+            model: "google/gemma-4-26b-a4b-it:free"
+          - provider: "nvidia"
+            model: "default"
       researcher:
         provider_chain:
           - provider: "openrouter"
-            model: "deepseek/deepseek-r1:free"
+            model: "nvidia/nemotron-3-super-120b-a12b:free"
+          - provider: "openrouter"
+            model: "deepseek/deepseek-v4-flash:free"
           - provider: "groq"
             model: "llama-3.3-70b-versatile"
+          - provider: "nvidia"
+            model: "default"
       critic:
         provider_chain:
           - provider: "groq"
             model: "llama-3.3-70b-versatile"
+          - provider: "openrouter"
+            model: "qwen/qwen3-next-80b-a3b-instruct:free"
+          - provider: "nvidia"
+            model: "default"
       finalizer:
         provider_chain:
           - provider: "openrouter"
-            model: "deepseek/deepseek-r1:free"
+            model: "deepseek/deepseek-v4-flash:free"
+          - provider: "openrouter"
+            model: "moonshotai/kimi-k2.6:free"
           - provider: "groq"
             model: "llama-3.3-70b-versatile"
+          - provider: "nvidia"
+            model: "default"

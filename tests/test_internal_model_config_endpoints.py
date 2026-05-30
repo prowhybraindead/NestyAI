@@ -85,11 +85,20 @@ def test_internal_model_config_crud_and_test_endpoint(client, monkeypatch, tmp_p
     list_resp = client.get("/internal/model-configs", headers=headers)
     assert list_resp.status_code == 200
     assert list_resp.json()["object"] == "list"
+    flash_row = next(item for item in list_resp.json()["data"] if item["model_id"] == "nesty-flash-1.0")
+    assert flash_row["default_config"]["provider_chain"][0]["provider"] == "groq"
+    assert flash_row["default_config"]["provider_chain"][1]["model"] == "google/gemma-4-26b-a4b-it:free"
 
     patch_resp = client.patch(
         "/internal/model-configs/nesty-flash-1.0",
         headers=headers,
-        json={"override": {"display_name": "Flash Runtime"}, "changed_by_label": "nesty-console"},
+        json={
+            "override": {
+                "display_name": "Flash Runtime",
+                "provider_chain": [{"provider": "openrouter", "model": "deepseek/deepseek-v4-flash:free"}],
+            },
+            "changed_by_label": "nesty-console",
+        },
     )
     assert patch_resp.status_code == 200
     assert patch_resp.json()["ok"] is True
@@ -98,6 +107,31 @@ def test_internal_model_config_crud_and_test_endpoint(client, monkeypatch, tmp_p
     get_resp = client.get("/internal/model-configs/nesty-flash-1.0", headers=headers)
     assert get_resp.status_code == 200
     assert get_resp.json()["override_config"]["display_name"] == "Flash Runtime"
+    assert get_resp.json()["effective_config"]["provider_chain"][0]["model"] == "deepseek/deepseek-v4-flash:free"
+
+    pro_patch_resp = client.patch(
+        "/internal/model-configs/nesty-pro-1.0",
+        headers=headers,
+        json={
+            "override": {
+                "orchestration_roles": {
+                    "finalizer": {
+                        "provider_chain": [
+                            {"provider": "openrouter", "model": "openai/gpt-oss-120b:free"},
+                            {"provider": "groq", "model": "llama-3.3-70b-versatile"},
+                        ]
+                    }
+                }
+            },
+            "changed_by_label": "nesty-console",
+        },
+    )
+    assert pro_patch_resp.status_code == 200
+    assert pro_patch_resp.json()["ok"] is True
+    assert (
+        pro_patch_resp.json()["effective_config"]["orchestration_roles"]["finalizer"]["provider_chain"][0]["model"]
+        == "openai/gpt-oss-120b:free"
+    )
 
     test_resp = client.post(
         "/internal/model-configs/nesty-flash-1.0/test",
@@ -111,6 +145,16 @@ def test_internal_model_config_crud_and_test_endpoint(client, monkeypatch, tmp_p
     reset_resp = client.post("/internal/model-configs/nesty-flash-1.0/reset", headers=headers)
     assert reset_resp.status_code == 200
     assert reset_resp.json()["config_source"] == "default"
+    assert reset_resp.json()["effective_config"]["provider_chain"][0]["provider"] == "groq"
+    assert reset_resp.json()["effective_config"]["provider_chain"][1]["model"] == "google/gemma-4-26b-a4b-it:free"
+
+    pro_reset_resp = client.post("/internal/model-configs/nesty-pro-1.0/reset", headers=headers)
+    assert pro_reset_resp.status_code == 200
+    assert pro_reset_resp.json()["config_source"] == "default"
+    assert (
+        pro_reset_resp.json()["effective_config"]["orchestration_roles"]["finalizer"]["provider_chain"][0]["model"]
+        == "deepseek/deepseek-v4-flash:free"
+    )
 
     audit_resp = client.get("/internal/model-configs/audit?model_id=nesty-flash-1.0&limit=20", headers=headers)
     assert audit_resp.status_code == 200

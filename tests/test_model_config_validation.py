@@ -37,3 +37,21 @@ def test_secret_like_value_rejected() -> None:
     )
     assert valid is False
     assert "secret-like" in str(error or "")
+
+
+def test_embedding_model_in_chat_provider_chain_rejected() -> None:
+    valid, error = validate_model_config_override(
+        "nesty-flash-1.0",
+        {"provider_chain": [{"provider": "openrouter", "model": "nvidia/llama-nemotron-embed-vl-1b-v2:free"}]},
+    )
+    assert valid is False
+    assert "embedding model" in str(error or "")
+
+
+def test_explicit_free_chat_model_ids_accepted() -> None:
+    valid, error = validate_model_config_override(
+        "nesty-combined-1.0",
+        {"provider_chain": [{"provider": "openrouter", "model": "moonshotai/kimi-k2.6:free"}]},
+    )
+    assert valid is True
+    assert error is None

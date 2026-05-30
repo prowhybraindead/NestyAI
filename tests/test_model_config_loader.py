@@ -37,13 +37,13 @@ def test_effective_config_uses_override_and_provider_chain_replaces(tmp_path, mo
 
     override = {
         "display_name": "Flash Runtime",
-        "provider_chain": [{"provider": "openrouter", "model": "qwen/qwen3-14b:free"}],
+        "provider_chain": [{"provider": "openrouter", "model": "deepseek/deepseek-v4-flash:free"}],
     }
     upsert_model_override("nesty-flash-1.0", override, changed_by_label="test", db_path=db_path)
     effective = get_effective_model_config("nesty-flash-1.0")
     assert effective is not None
     assert effective["display_name"] == "Flash Runtime"
-    assert effective["provider_chain"] == [{"provider": "openrouter", "model": "qwen/qwen3-14b:free"}]
+    assert effective["provider_chain"] == [{"provider": "openrouter", "model": "deepseek/deepseek-v4-flash:free"}]
 
 
 def test_merge_model_config_deep_merge_dicts() -> None:
@@ -66,3 +66,26 @@ def test_list_effective_model_configs_contains_source(tmp_path, monkeypatch) -> 
     combined = next(item for item in rows if item["model_id"] == "nesty-combined-1.0")
     assert combined["config_source"] == "override"
     assert combined["effective_config"]["display_name"] == "Combined Runtime"
+
+
+def test_effective_config_can_override_pro_finalizer_provider_chain(tmp_path, monkeypatch) -> None:
+    db_path = str(tmp_path / "effective_pro_finalizer.db")
+    init_db(db_path)
+    monkeypatch.setattr("app.storage.model_configs.get_settings", lambda: type("S", (), {"nesty_db_path": db_path})())
+
+    override = {
+        "orchestration_roles": {
+            "finalizer": {
+                "provider_chain": [
+                    {"provider": "openrouter", "model": "openai/gpt-oss-120b:free"},
+                    {"provider": "groq", "model": "llama-3.3-70b-versatile"},
+                ]
+            }
+        }
+    }
+    upsert_model_override("nesty-pro-1.0", override, changed_by_label="test", db_path=db_path)
+    effective = get_effective_model_config("nesty-pro-1.0")
+    assert effective is not None
+    assert (
+        effective["orchestration_roles"]["finalizer"]["provider_chain"][0]["model"] == "openai/gpt-oss-120b:free"
+    )

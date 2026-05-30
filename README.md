@@ -10,7 +10,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-Production%20Ready-009688" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/tests-151%20passed-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-205%20passed-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-orange" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/streaming-SSE-ff9800" alt="SSE" />
 </p>
@@ -282,6 +282,27 @@ Runtime config notes:
 - Do not store API keys/secrets in model config overrides
 - Reset endpoint restores effective config back to YAML defaults
 
+## Phase 7.0d: Provider Chain Tuning For Free Chat Models
+
+Default model chains are now tuned for personal chat-focused usage with explicit free chat model IDs.
+
+- `nesty-flash-1.0`: keeps Groq primary for fastest token output, with OpenRouter + NVIDIA fallback.
+- `nesty-combined-1.0`: prioritizes selected OpenRouter free chat models, then Groq, then NVIDIA fallback.
+- `nesty-pro-1.0`: balances OpenRouter and Groq in main chain and across orchestration roles, with NVIDIA fallback.
+
+Notes:
+
+- NVIDIA NIMs remain fallback because free endpoint speed is not benchmarked yet.
+- `openrouter/free` generic target is intentionally not used as the primary default.
+- Coding-oriented candidate `qwen/qwen3-coder:free` is documented for coding-focused forks, but not prioritized in default chat chains.
+- Embedding candidate `nvidia/llama-nemotron-embed-vl-1b-v2:free` is reserved for future embedding/semantic recall phases and is not used in chat chains.
+
+Runtime override compatibility:
+
+- You can override `provider_chain` and orchestration role chains at runtime via the internal model-config API from Phase 7.0c.
+- Effective runtime config remains: `YAML default + active SQLite override`.
+- Provider availability and free-model limits can change over time; tune via internal overrides when needed.
+
 ## Docs And Examples
 
 - Full technical documentation: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)
@@ -291,7 +312,7 @@ Runtime config notes:
 
 ## Quality Status
 
-- Test suite: **151 passed**
+- Test suite: **205 passed**
 - Streaming contract: enabled
 - Conversation controls/search: enabled
 

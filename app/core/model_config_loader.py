@@ -169,6 +169,9 @@ def _validate_provider_chain(provider_chain: Any) -> tuple[bool, str | None]:
             return False, f"model_config_invalid: unsupported provider '{provider}'"
         if not model:
             return False, "model_config_invalid: provider_chain model must be non-empty"
+        # Chat provider chains must not use embedding-oriented model IDs.
+        if "embed" in model.lower():
+            return False, "model_config_invalid: embedding model IDs are not allowed in chat provider chains"
     return True, None
 
 
