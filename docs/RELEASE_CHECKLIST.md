@@ -43,6 +43,19 @@ Use this checklist to verify the stability, security, and setup readiness of Nes
 - [ ] **Backup Database Before Upgrades**
   - Back up `data/nesty.db` before applying migrations or upgrading local databases in case rollback is needed.
 
+- [ ] **Verify API Contracts & Error Guidelines**
+  - Verify that the endpoints strictly conform to the spec in `docs/API_CONTRACT.md`.
+  - Confirm error response formats and error codes align with `docs/ERRORS.md`.
+
+- [ ] **Verify OpenAPI Export**
+  - Run the OpenAPI exporter script: `python scripts/export_openapi.py`
+  - Confirm `docs/openapi.json` is generated successfully without error.
+
+- [ ] **Smoke Test Client Examples**
+  - Run non-streaming example: `python examples/python/chat_non_stream.py`
+  - Run streaming example: `python examples/python/chat_stream.py`
+  - Ensure both retrieve valid mock responses from the local server.
+
 - [ ] **Tag Release**
   - Tag the release version: `git tag -a vX.Y.Z -m "Release version X.Y.Z"`
   - Push tags: `git push origin vX.Y.Z`

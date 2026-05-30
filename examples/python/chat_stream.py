@@ -27,12 +27,20 @@ def main() -> int:
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
+    # Parse optional environment configurations
+    store_val = os.getenv("NESTY_STORE", "false").strip().lower() in {"1", "true", "yes", "on"}
+    search_val = os.getenv("NESTY_SEARCH", "off").strip().lower()
+    tools_val = os.getenv("NESTY_TOOLS", "off").strip().lower()
+    semantic_recall_val = os.getenv("NESTY_SEMANTIC_RECALL", "auto").strip().lower()
+
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": "Write a short intro about NestyAI."}],
         "stream": True,
-        "search": "off",
-        "tools": "off",
+        "store": store_val,
+        "search": search_val,
+        "tools": tools_val,
+        "semantic_recall": semantic_recall_val,
     }
 
     metadata_event: dict | None = None

@@ -103,6 +103,7 @@ def build_error_response(code: str, message: str, details: dict[str, Any] | None
         "error": {
             "code": code,
             "message": message,
+            "type": "api_error",
             "details": details or {},
         }
     }

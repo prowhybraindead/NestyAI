@@ -19,12 +19,20 @@ async function main() {
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
+  // Parse optional environment configurations
+  const storeVal = (process.env.NESTY_STORE || "false").trim().toLowerCase() === "true";
+  const searchVal = (process.env.NESTY_SEARCH || "off").trim().toLowerCase();
+  const toolsVal = (process.env.NESTY_TOOLS || "off").trim().toLowerCase();
+  const semanticRecallVal = (process.env.NESTY_SEMANTIC_RECALL || "auto").trim().toLowerCase();
+
   const payload = {
     model,
     messages: [{ role: "user", content: "Write a short intro about NestyAI." }],
     stream: true,
-    search: "off",
-    tools: "off",
+    store: storeVal,
+    search: searchVal,
+    tools: toolsVal,
+    semantic_recall: semanticRecallVal,
   };
 
   let response;

@@ -125,3 +125,4 @@ class ChatCompletionResponse(BaseModel):
     provider_health: ProviderHealthInfo | None = None
     auth: AuthDebugInfo | None = None
     conversation: ConversationInfo | None = None
+    model_alias: str | None = None

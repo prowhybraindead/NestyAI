@@ -265,6 +265,13 @@ Semantic recall requires:
   ```
 - Summary endpoint: Reliability arrays are appended to `/internal/diagnostics/provider-health/summary`.
 
+### API Stability, Compatibility, and SDK Prep (Phase 9.0)
+
+- **Stable Contracts**: Core contracts for completions, models, and conversations frozen and documented in [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md).
+- **Error Specification**: Standardized error responses detailed in [`docs/ERRORS.md`](docs/ERRORS.md). All gateway responses map standard codes with type indicators.
+- **OpenAPI Schema Exporter**: Export the API schema locally using `python scripts/export_openapi.py`.
+- **Blueprints for SDKs**: SDK preparatory patterns for Python, JS/TS, and Android documented in [`docs/SDK_PREP.md`](docs/SDK_PREP.md).
+
 ---
 
 ## Internal Admin APIs
@@ -412,6 +419,7 @@ See [`.env.example`](.env.example) for full list.
 - `python scripts/benchmark_provider_chains.py --include-roles`
 - `python scripts/benchmark_provider_chains.py --include-roles --only-unhealthy`
 - `python scripts/provider_health_summary.py --limit 50 --since-seconds 3600`
+- `python scripts/export_openapi.py` (exports OpenAPI schema JSON)
 
 Scheduler examples (manual ops wiring, no built-in scheduler):
 
@@ -498,6 +506,9 @@ curl "http://127.0.0.1:8000/v1/conversations/memory-controls?pinned=true&limit=2
 - Technical notes: [`docs/README_TECHNICAL.md`](docs/README_TECHNICAL.md)
 - Deployment guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 - Release checklist: [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)
+- API contract specs: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)
+- Standard error spec: [`docs/ERRORS.md`](docs/ERRORS.md)
+- SDK preparation blueprints: [`docs/SDK_PREP.md`](docs/SDK_PREP.md)
 - Examples: [`examples/`](examples)
 
 ---

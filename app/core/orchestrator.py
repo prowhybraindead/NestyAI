@@ -255,6 +255,7 @@ class ChatOrchestrator:
                 orchestration=orchestration,
                 semantic_recall=semantic_recall,
                 provider_health=provider_health_info,
+                model_alias=request.model,
             )
         except APIError as exc:
             log_safe(
@@ -463,6 +464,7 @@ class ChatOrchestrator:
                         if outcome.conversation_id
                         else None
                     ),
+                    "model_alias": request.model,
                 }
             )
             yield self._done_sse()

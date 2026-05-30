@@ -90,3 +90,8 @@ def test_list_render_does_not_expose_key_hash() -> None:
     joined = "\n".join(lines)
     assert "key_hash" not in joined
     assert "sha256:secret" not in joined
+
+
+def test_export_openapi_module_import_has_no_side_effects() -> None:
+    module = importlib.import_module("scripts.export_openapi")
+    assert callable(module.main)

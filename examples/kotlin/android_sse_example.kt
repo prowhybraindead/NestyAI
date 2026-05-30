@@ -16,7 +16,11 @@ import java.io.BufferedReader
 fun streamChatFromNestyAi(
     baseUrl: String,
     apiKey: String,
-    model: String = "nesty-combined-1.0"
+    model: String = System.getenv("NESTY_MODEL") ?: "nesty-combined-1.0",
+    store: Boolean = System.getenv("NESTY_STORE")?.toBoolean() ?: false,
+    search: String = System.getenv("NESTY_SEARCH") ?: "off",
+    tools: String = System.getenv("NESTY_TOOLS") ?: "off",
+    semanticRecall: String = System.getenv("NESTY_SEMANTIC_RECALL") ?: "auto"
 ) {
     val client = OkHttpClient()
     val jsonBody = """
@@ -24,8 +28,10 @@ fun streamChatFromNestyAi(
           "model": "$model",
           "messages": [{"role":"user","content":"Write a short intro about NestyAI."}],
           "stream": true,
-          "search": "off",
-          "tools": "off"
+          "store": $store,
+          "search": "$search",
+          "tools": "$tools",
+          "semantic_recall": "$semanticRecall"
         }
     """.trimIndent()
 
