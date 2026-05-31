@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 from difflib import SequenceMatcher
@@ -16,19 +16,19 @@ _MEMORY_KEYWORDS = [
     "what did i say earlier",
     "remember",
     "based on our previous conversation",
-    "nhá»›",
-    "trÆ°á»›c Ä‘Ã³",
-    "lÃºc nÃ£y",
-    "mÃ¬nh Ä‘Ã£ nÃ³i",
-    "dá»±a trÃªn cuá»™c trÃ² chuyá»‡n",
+    "nhớ",
+    "trước đó",
+    "lúc nãy",
+    "mình đã nói",
+    "dựa trên cuộc trò chuyện",
 ]
 _FOLLOWUP_HINTS = [
     "that",
     "this project",
     "continue",
-    "tiáº¿p tá»¥c",
-    "cÃ¡i Ä‘Ã³",
-    "pháº§n Ä‘Ã³",
+    "tiếp tục",
+    "cái đó",
+    "phần đó",
 ]
 
 
@@ -358,3 +358,4 @@ def _build_memory_context(matches: list[dict[str, Any]], context_max_chars: int)
     if len(context) > context_max_chars:
         context = context[:context_max_chars].rstrip()
     return context
+

@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 import httpx
 
 from app.core.errors import MissingAPIKeyError, ProviderError
+from app.core.http_client import get_shared_async_client
 from app.providers.base import BaseProvider
 from app.schemas.chat import ChatMessage
 from app.schemas.provider import ProviderChatResult, ProviderStreamChunk, ProviderUsage
@@ -42,8 +43,8 @@ class OpenRouterProvider(BaseProvider):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(self.endpoint, json=payload, headers=headers)
+            client = get_shared_async_client(timeout_seconds=self.timeout_seconds)
+            response = await client.post(self.endpoint, json=payload, headers=headers)
         except httpx.TimeoutException as exc:
             raise ProviderError(
                 provider=self.provider_name,
@@ -118,57 +119,57 @@ class OpenRouterProvider(BaseProvider):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                async with client.stream("POST", self.endpoint, json=payload, headers=headers) as response:
-                    if response.status_code == 429 or response.status_code >= 500:
-                        raise ProviderError(
-                            provider=self.provider_name,
-                            message="Provider temporarily unavailable.",
-                            retryable=True,
-                            status_code=response.status_code,
-                        )
-                    if response.status_code >= 400:
-                        raise ProviderError(
-                            provider=self.provider_name,
-                            message="Provider rejected request.",
-                            retryable=False,
-                            status_code=response.status_code,
-                        )
+            client = get_shared_async_client(timeout_seconds=self.timeout_seconds)
+            async with client.stream("POST", self.endpoint, json=payload, headers=headers) as response:
+                if response.status_code == 429 or response.status_code >= 500:
+                    raise ProviderError(
+                        provider=self.provider_name,
+                        message="Provider temporarily unavailable.",
+                        retryable=True,
+                        status_code=response.status_code,
+                    )
+                if response.status_code >= 400:
+                    raise ProviderError(
+                        provider=self.provider_name,
+                        message="Provider rejected request.",
+                        retryable=False,
+                        status_code=response.status_code,
+                    )
 
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        if not line.startswith("data:"):
-                            continue
-                        raw_data = line[len("data:") :].strip()
-                        if raw_data == "[DONE]":
-                            break
-                        try:
-                            data = json.loads(raw_data)
-                        except json.JSONDecodeError:
-                            continue
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    raw_data = line[len("data:") :].strip()
+                    if raw_data == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(raw_data)
+                    except json.JSONDecodeError:
+                        continue
 
-                        usage_raw = data.get("usage")
-                        if isinstance(usage_raw, dict):
-                            yield ProviderStreamChunk(
-                                usage=ProviderUsage(
-                                    prompt_tokens=int(usage_raw.get("prompt_tokens", 0) or 0),
-                                    completion_tokens=int(usage_raw.get("completion_tokens", 0) or 0),
-                                    total_tokens=int(usage_raw.get("total_tokens", 0) or 0),
-                                )
+                    usage_raw = data.get("usage")
+                    if isinstance(usage_raw, dict):
+                        yield ProviderStreamChunk(
+                            usage=ProviderUsage(
+                                prompt_tokens=int(usage_raw.get("prompt_tokens", 0) or 0),
+                                completion_tokens=int(usage_raw.get("completion_tokens", 0) or 0),
+                                total_tokens=int(usage_raw.get("total_tokens", 0) or 0),
                             )
+                        )
 
-                        choices = data.get("choices") or []
-                        for choice in choices:
-                            delta_obj = choice.get("delta") or {}
-                            content = delta_obj.get("content")
-                            finish_reason = choice.get("finish_reason")
-                            if content is None:
-                                content = ""
-                            yield ProviderStreamChunk(
-                                delta=str(content),
-                                finish_reason=str(finish_reason) if finish_reason else None,
-                            )
+                    choices = data.get("choices") or []
+                    for choice in choices:
+                        delta_obj = choice.get("delta") or {}
+                        content = delta_obj.get("content")
+                        finish_reason = choice.get("finish_reason")
+                        if content is None:
+                            content = ""
+                        yield ProviderStreamChunk(
+                            delta=str(content),
+                            finish_reason=str(finish_reason) if finish_reason else None,
+                        )
         except httpx.TimeoutException as exc:
             raise ProviderError(
                 provider=self.provider_name,

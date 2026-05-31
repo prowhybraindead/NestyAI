@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 import httpx
 
 from app.core.errors import MissingAPIKeyError, ProviderError, StreamingNotSupportedError
+from app.core.http_client import get_shared_async_client
 from app.providers.base import BaseProvider
 from app.schemas.chat import ChatMessage
 from app.schemas.provider import ProviderChatResult, ProviderStreamChunk, ProviderUsage
@@ -53,8 +54,8 @@ class NvidiaProvider(BaseProvider):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(self.endpoint, json=payload, headers=headers)
+            client = get_shared_async_client(timeout_seconds=self.timeout_seconds)
+            response = await client.post(self.endpoint, json=payload, headers=headers)
         except httpx.TimeoutException as exc:
             raise ProviderError(
                 provider=self.provider_name,

@@ -17,6 +17,7 @@ from app.api.internal_model_configs import router as internal_model_configs_rout
 from app.api.models import router as models_router
 from app.config import Settings
 from app.core.errors import APIError, build_error_response
+from app.core.http_client import close_shared_async_client
 from app.deps import get_settings
 from app.middleware.api_version import APIVersionHeaderMiddleware
 from app.middleware.body_size import BodySizeLimitMiddleware
@@ -60,7 +61,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if db_path not in _initialized_db_paths:
             init_db(db_path)
             _initialized_db_paths.add(db_path)
-        yield
+        try:
+            yield
+        finally:
+            await close_shared_async_client()
 
     app = FastAPI(
         title=app_settings.app_name,

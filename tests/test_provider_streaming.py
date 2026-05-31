@@ -27,12 +27,6 @@ class _FakeAsyncClient:
         self.status_code = status_code
         self.lines = lines
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return False
-
     def stream(self, method: str, url: str, json, headers):
         return _FakeStreamResponse(self.status_code, self.lines)
 
@@ -47,8 +41,8 @@ async def test_groq_provider_stream_normalizes_chunks(monkeypatch) -> None:
         "data: [DONE]",
     ]
     monkeypatch.setattr(
-        "app.providers.groq.httpx.AsyncClient",
-        lambda timeout: _FakeAsyncClient(status_code=200, lines=lines),
+        "app.providers.groq.get_shared_async_client",
+        lambda timeout_seconds: _FakeAsyncClient(status_code=200, lines=lines),
     )
 
     provider = GroqProvider(api_key="test", timeout_seconds=10)
@@ -79,8 +73,8 @@ async def test_openrouter_provider_stream_normalizes_chunks(monkeypatch) -> None
         "data: [DONE]",
     ]
     monkeypatch.setattr(
-        "app.providers.openrouter.httpx.AsyncClient",
-        lambda timeout: _FakeAsyncClient(status_code=200, lines=lines),
+        "app.providers.openrouter.get_shared_async_client",
+        lambda timeout_seconds: _FakeAsyncClient(status_code=200, lines=lines),
     )
 
     provider = OpenRouterProvider(api_key="test", timeout_seconds=10)

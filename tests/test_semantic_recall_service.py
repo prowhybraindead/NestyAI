@@ -67,6 +67,34 @@ def test_should_use_semantic_recall_auto_trigger_and_skip(monkeypatch) -> None:
     assert skip["should_use"] is False
 
 
+def test_should_use_semantic_recall_vietnamese_followup_keywords(monkeypatch) -> None:
+    monkeypatch.setattr("app.core.semantic_recall.count_embedding_records", lambda: 3)
+    req = type("R", (), {"semantic_recall": "auto", "store": True, "conversation_id": "conv_1"})()
+
+    use_cases = [
+        "lúc nãy mình nói gì?",
+        "trước đó mình nhắc về provider chain",
+        "tiếp tục phần đó",
+        "mình đã nói gì về NestyAI?",
+    ]
+    for text in use_cases:
+        decision = should_use_semantic_recall(
+            request=req,
+            model_config={"behavior_profile": "pro"},
+            context_metadata={"latest_user_message": text},
+            config=_config(),
+        )
+        assert decision["should_use"] is True
+
+    skip = should_use_semantic_recall(
+        request=req,
+        model_config={"behavior_profile": "flash"},
+        context_metadata={"latest_user_message": "xin chào nhé"},
+        config=_config(),
+    )
+    assert skip["should_use"] is False
+
+
 def test_should_use_semantic_recall_on_mode_forces_use_when_available(monkeypatch) -> None:
     monkeypatch.setattr("app.core.semantic_recall.count_embedding_records", lambda: 2)
     req = type("R", (), {"semantic_recall": "on", "store": True, "conversation_id": "conv_1"})()

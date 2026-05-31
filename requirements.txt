@@ -8,8 +8,3 @@ ddgs>=7.2.0
 beautifulsoup4>=4.12.3
 trafilatura>=1.12.2
 idna>=3.7
-
-# Testing dependencies (Phase 2.5)
-pytest>=8.3.0
-pytest-asyncio>=0.24.0
-pytest-httpx>=0.35.0
